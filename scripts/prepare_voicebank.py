@@ -159,8 +159,10 @@ def main() -> None:
 
     train_clean = extracted / "train28" / "clean"
     train_noisy = extracted / "train28" / "noisy"
-    test_clean = extracted / "test" / "clean"
-    test_noisy = extracted / "test" / "noisy"
+    # Reuse the already prepared legacy test extraction instead of keeping a
+    # second 325 MB copy under ``extracted/test``.
+    test_clean = extracted / "clean"
+    test_noisy = extracted / "noisy"
     train_conditions = read_voicebank_condition_log(
         log_archive, "log_trainset_28spk.txt"
     )
