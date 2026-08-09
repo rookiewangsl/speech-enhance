@@ -19,7 +19,7 @@ class Download:
     split: str
     filename: str
     url: str
-    minimum_bytes: int
+    expected_bytes: int
 
 
 DOWNLOADS = (
@@ -28,28 +28,28 @@ DOWNLOADS = (
         "clean_testset_wav.zip",
         "https://datashare.ed.ac.uk/bitstreams/"
         "dec213d3-bf57-4777-9663-c24bdce92d5e/download",
-        100 * 1024**2,
+        154_332_064,
     ),
     Download(
         "test",
         "noisy_testset_wav.zip",
         "https://datashare.ed.ac.uk/bitstreams/"
         "13c1bfbf-14a6-41db-9b41-8f7310f01ad5/download",
-        100 * 1024**2,
+        170_578_854,
     ),
     Download(
         "train28",
         "clean_trainset_28spk_wav.zip",
         "https://datashare.ed.ac.uk/bitstreams/"
         "245452b6-6235-44b6-a6f9-e7eb19797769/download",
-        2 * 1024**3,
+        2_486_057_279,
     ),
     Download(
         "train28",
         "noisy_trainset_28spk_wav.zip",
         "https://datashare.ed.ac.uk/bitstreams/"
         "ecb5a102-bb00-46d3-8af5-40c79823b837/download",
-        2 * 1024**3,
+        2_830_205_201,
     ),
 )
 
@@ -66,7 +66,7 @@ def download(item: Download, directory: Path, retries: int = 5) -> Path:
     """Download through a resumable temporary path and verify response length."""
 
     destination = directory / item.filename
-    if destination.exists() and destination.stat().st_size >= item.minimum_bytes:
+    if destination.exists() and destination.stat().st_size == item.expected_bytes:
         return destination
     temporary = destination.with_suffix(destination.suffix + ".part")
 
@@ -88,8 +88,11 @@ def download(item: Download, directory: Path, retries: int = 5) -> Path:
             expected_total = offset + int(expected) if expected is not None else None
             if expected_total is not None and temporary.stat().st_size != expected_total:
                 raise OSError("download length does not match Content-Length")
-            if temporary.stat().st_size < item.minimum_bytes:
-                raise OSError("download is unexpectedly small")
+            if temporary.stat().st_size != item.expected_bytes:
+                raise OSError(
+                    "download size mismatch: expected "
+                    f"{item.expected_bytes}, got {temporary.stat().st_size}"
+                )
             temporary.replace(destination)
             return destination
         except (OSError, TimeoutError) as error:

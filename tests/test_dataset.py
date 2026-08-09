@@ -12,6 +12,7 @@ from speech_frontend.dataset import (
     discover_voicebank_pairs,
     resample_aligned_pair,
     safe_extract_wav_zip,
+    sample_manifest_rows_by_speaker,
     split_pairs_by_speaker,
     split_pairs_by_speaker_count,
 )
@@ -69,6 +70,27 @@ def test_split_pairs_by_speaker_count_is_exact_and_reproducible(
     assert [item.utterance_id for item in first] == [
         item.utterance_id for item in repeated
     ]
+
+
+def test_sample_manifest_rows_is_balanced_and_reproducible() -> None:
+    rows = [
+        {"id": f"{speaker}_{index}", "speaker_id": speaker}
+        for speaker, count in (("p1", 4), ("p2", 3), ("p3", 2))
+        for index in range(count)
+    ]
+    sampled = sample_manifest_rows_by_speaker(
+        rows, items_per_speaker=2, seed=11
+    )
+    repeated = sample_manifest_rows_by_speaker(
+        rows, items_per_speaker=2, seed=11
+    )
+
+    counts = {
+        speaker: sum(row["speaker_id"] == speaker for row in sampled)
+        for speaker in ("p1", "p2", "p3")
+    }
+    assert counts == {"p1": 2, "p2": 2, "p3": 2}
+    assert sampled == repeated
 
 
 def test_discover_rejects_unmatched_files(tmp_path: Path) -> None:

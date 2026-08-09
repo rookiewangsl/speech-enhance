@@ -133,6 +133,33 @@ def split_pairs_by_speaker_count(
     return first, second
 
 
+def sample_manifest_rows_by_speaker(
+    rows: list[dict[str, Any]],
+    *,
+    items_per_speaker: int,
+    seed: int = 20260724,
+) -> list[dict[str, Any]]:
+    """Take a reproducible, balanced utterance sample from every speaker."""
+
+    if items_per_speaker <= 0:
+        raise ValueError("items_per_speaker must be positive")
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        speaker_id = row.get("speaker_id")
+        if not isinstance(speaker_id, str) or not speaker_id:
+            raise ValueError("each manifest row must have a speaker_id")
+        grouped.setdefault(speaker_id, []).append(row)
+    if not grouped:
+        raise ValueError("manifest has no rows")
+
+    sampled: list[dict[str, Any]] = []
+    for speaker_id in sorted(grouped):
+        candidates = sorted(grouped[speaker_id], key=lambda row: str(row["id"]))
+        random.Random(f"{seed}:{speaker_id}").shuffle(candidates)
+        sampled.extend(candidates[:items_per_speaker])
+    return sampled
+
+
 def resample_aligned_pair(
     clean: AudioData,
     noisy: AudioData,
