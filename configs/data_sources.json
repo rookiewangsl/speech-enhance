@@ -1,0 +1,20 @@
+{
+  "voicebank_demand": {
+    "official_page": "https://datashare.ed.ac.uk/handle/10283/2791",
+    "subset": "official_test_pairs",
+    "downloaded_on": "2026-07-24",
+    "archives": [
+      {
+        "filename": "clean_testset_wav.zip",
+        "url": "https://datashare.ed.ac.uk/bitstreams/dec213d3-bf57-4777-9663-c24bdce92d5e/download",
+        "sha256": "b60bfc2b9df38466d8eb45057c087c6e5dee196c67a0ed7bca628ae2a8611c4e"
+      },
+      {
+        "filename": "noisy_testset_wav.zip",
+        "url": "https://datashare.ed.ac.uk/bitstreams/13c1bfbf-14a6-41db-9b41-8f7310f01ad5/download",
+        "sha256": "ba4a893f45b627f15209ba30ab584dd495b3680cd6f216dd08d143a257611993"
+      }
+    ],
+    "split_note": "The internal dev/holdout split is speaker-disjoint and is not the official benchmark protocol."
+  }
+}

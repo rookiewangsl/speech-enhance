@@ -1,0 +1,52 @@
+{
+  "audio": {
+    "sample_rate": 16000,
+    "channels": 1,
+    "dtype": "float32"
+  },
+  "stft": {
+    "frame_length": 512,
+    "hop_length": 128,
+    "fft_length": 512,
+    "window": "sqrt_periodic_hann"
+  },
+  "vad": {
+    "frame_ms": 20,
+    "hop_ms": 10,
+    "noise_history_seconds": 2.0,
+    "noise_percentile": 20.0,
+    "initial_noise_floor_db": -55.0,
+    "noise_floor_rise_smoothing": 0.98,
+    "noise_floor_fall_smoothing": 0.8,
+    "threshold_on_db": 12.0,
+    "threshold_off_db": 9.0,
+    "onset_frames": 2,
+    "minimum_speech_ms": 100,
+    "hangover_ms": 200,
+    "pre_roll_ms": 100
+  },
+  "enhancement": {
+    "alpha_dd": 0.92,
+    "gain_floor": 0.30,
+    "mcra_alpha_d": 0.95,
+    "mcra_alpha_p": 0.2,
+    "mcra_alpha_s": 0.8,
+    "mcra_minimum_window_frames": 125,
+    "mcra_ratio_threshold": 5.0,
+    "gain_decrease_smoothing": 0.7,
+    "gain_increase_smoothing": 0.4,
+    "speech_absence_prior_min": 0.05,
+    "speech_absence_prior_max": 0.95
+  },
+  "statistical_vad": {
+    "alpha_dd": 0.96,
+    "score_threshold_on": 20.0,
+    "score_threshold_off": 10.0,
+    "frequency_range_hz": [80, 4000],
+    "note": "Smoke-dev selected; re-tune only on a larger dev split before final reporting."
+  },
+  "external_vad": {
+    "webrtc_aggressiveness": 3,
+    "note": "External industrial baseline only; never the project core method."
+  }
+}

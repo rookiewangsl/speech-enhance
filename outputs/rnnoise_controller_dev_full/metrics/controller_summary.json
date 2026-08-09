@@ -1,0 +1,42 @@
+{
+  "r3_official": {
+    "files": 393,
+    "mean_si_sdri_db": 2.6139197253831727,
+    "median_si_sdri_db": 2.864048844322613,
+    "positive_si_sdri_fraction": 0.7201017811704835,
+    "mean_stoi_improvement": -0.024158628846422624,
+    "median_stoi_improvement": -0.008996391501187584,
+    "nonnegative_stoi_fraction": 0.30788804071246817,
+    "mean_strength": 1.0
+  },
+  "r4a_fixed_050": {
+    "files": 393,
+    "mean_si_sdri_db": 3.156476876907375,
+    "median_si_sdri_db": 3.3927412518479603,
+    "positive_si_sdri_fraction": 0.9491094147582697,
+    "mean_stoi_improvement": 0.005405951140442913,
+    "median_stoi_improvement": 0.002210833181477301,
+    "nonnegative_stoi_fraction": 0.6870229007633588,
+    "mean_strength": 0.5
+  },
+  "r4d_correction_-9db_vad015": {
+    "files": 393,
+    "mean_si_sdri_db": 4.143736359097954,
+    "median_si_sdri_db": 4.071875773243195,
+    "positive_si_sdri_fraction": 0.8956743002544529,
+    "mean_stoi_improvement": -0.008453931627706933,
+    "median_stoi_improvement": -0.0035865340552051483,
+    "nonnegative_stoi_fraction": 0.36895674300254455,
+    "mean_strength": 0.6780195920976974
+  },
+  "r4d_correction_-9db_vad030": {
+    "files": 393,
+    "mean_si_sdri_db": 4.027022271941332,
+    "median_si_sdri_db": 3.997362008916838,
+    "positive_si_sdri_fraction": 0.9185750636132316,
+    "mean_stoi_improvement": -0.0041562340785029255,
+    "median_stoi_improvement": -0.0011214966463718445,
+    "nonnegative_stoi_fraction": 0.4223918575063613,
+    "mean_strength": 0.6042725364215501
+  }
+}

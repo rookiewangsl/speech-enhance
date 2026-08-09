@@ -1,0 +1,33 @@
+{
+  "source": {
+    "repository": "https://github.com/xiph/rnnoise.git",
+    "commit": "70f1d256acd4b34a572f999a05c87bf00b67730d",
+    "commit_date": "2025-02-22T18:58:18-05:00",
+    "license": "BSD-3-Clause"
+  },
+  "model": {
+    "archive_sha256": "0a8755f8e2d834eff6a54714ecc7d75f9932e845df35f8b59bc52a7cfe6e8b37",
+    "rnnoise_data_c_sha256": "d6021b7697677c4d2274c912975e143765552b0e6f25500aa660fdb4a9849be5",
+    "rnnoise_data_h_sha256": "09ff880bddd0fc74a2ae0e5ec6c8d65714031b08d0c3f672493acd9e189c5855"
+  },
+  "audio_contract": {
+    "sample_rate_hz": 48000,
+    "frame_samples": 480,
+    "channels": 1,
+    "cli_sample_format": "signed 16-bit native-endian raw PCM"
+  },
+  "build": {
+    "method": "direct C compiler build from pinned official sources",
+    "common_flags": [
+      "-O3",
+      "-fPIC",
+      "-DRNNOISE_BUILD",
+      "-DDISABLE_DEBUG_FLOAT"
+    ],
+    "verified_environment": {
+      "operating_system": "macOS 27.0",
+      "architecture": "arm64",
+      "compiler": "Apple clang 21.0.0"
+    }
+  }
+}
