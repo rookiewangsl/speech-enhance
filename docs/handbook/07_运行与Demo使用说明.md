@@ -1,6 +1,6 @@
 # 运行与 Demo 使用说明
 
-最后更新：2026-07-31
+最后更新：2026-08-09
 
 本文只维护安装、运行、输出检查和 Demo 评价方法。算法原理见
 [`02_项目模块与贡献边界.md`](02_项目模块与贡献边界.md)和
@@ -12,7 +12,7 @@
 项目目录：
 
 ```bash
-cd /Users/shilongwang/Library/CloudStorage/Dropbox/Code/cs61b_sp25/projects/realtime_speech_enhancement
+cd /Users/shilongwang/Library/CloudStorage/Dropbox/Code/realtime_speech_enhancement
 ```
 
 首次准备环境：
