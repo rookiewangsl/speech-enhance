@@ -317,3 +317,53 @@ afplay outputs/mic_demo/microphone_rnnoise.wav
 4. 解释R4为何客观指标较好但被听感否决；
 5. 运行或展示MacBook麦克风Demo；
 6. 明确官方模型与自主DSP/实时工程的贡献边界。
+
+## 9. 完整数据流程复现
+
+在项目根目录执行：
+
+```bash
+# 迁移目录后若虚拟环境仍指向旧路径
+./.venv/bin/python -m pip install --no-deps -e .
+
+# 下载完整 28-speaker train
+./.venv/bin/python scripts/download_voicebank.py \
+  --data-root data --subset train28
+
+# 20/8/official-test 预处理
+./.venv/bin/python scripts/prepare_voicebank.py \
+  --data-root data --protocol full28 \
+  --development-speakers 20 --seed 20260724 --workers 4
+
+# 校验 speaker/utterance 无泄漏
+./.venv/bin/python scripts/audit_full_protocol.py \
+  --project-root . --manifest-root data/manifests \
+  --output outputs/full_protocol/data_audit.json
+```
+
+冻结评估示例：
+
+```bash
+# RNNoise，完整未见 speaker validation
+./.venv/bin/python scripts/evaluate_rnnoise.py \
+  --manifest data/manifests/validation.jsonl \
+  --project-root . \
+  --output-root outputs/full_protocol/rnnoise/validation_full \
+  --chunk-size 137
+
+# 保守 DD-Wiener
+./.venv/bin/python scripts/evaluate_enhancement.py \
+  --manifest data/manifests/validation.jsonl \
+  --project-root . \
+  --output-root outputs/full_protocol/classical/validation_full \
+  --alpha-dd 0.92 --gain-floor 0.20 \
+  --methods mcra_dd_wiener
+
+# 按 noise/SNR 汇总
+./.venv/bin/python scripts/summarize_metrics_by_condition.py \
+  --input outputs/full_protocol/rnnoise/validation_full/metrics/rnnoise_metrics.csv \
+  --output outputs/full_protocol/rnnoise/validation_full/metrics/by_condition.json
+```
+
+固定 Demo 的试听顺序仍是 `clean reference → noisy input → R3 → C1`。完整数据结果不要求播放
+3,224 条音频；面试时增加一页 condition 表，主动说明 high-SNR 和 babble 失败即可。
