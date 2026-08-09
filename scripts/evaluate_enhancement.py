@@ -45,6 +45,7 @@ def main() -> None:
     parser.add_argument("--project-root", type=Path, default=Path("."))
     parser.add_argument("--output-root", type=Path, default=Path("outputs"))
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--save-audio", action="store_true")
     parser.add_argument("--alpha-dd", type=float, default=0.96)
     parser.add_argument("--gain-floor", type=float, default=0.30)
     parser.add_argument("--gain-decrease-smoothing", type=float, default=0.7)
@@ -100,8 +101,14 @@ def main() -> None:
             result = enhancer.enhance(noisy.samples, method=method)
             elapsed = time.perf_counter() - started
             output = AudioData(result.samples.astype(np.float32), noisy.sample_rate)
-            output_path = arguments.output_root / "audio" / method / f"{row['id']}.wav"
-            write_audio(output_path, output)
+            if arguments.save_audio:
+                output_path = (
+                    arguments.output_root
+                    / "audio"
+                    / method
+                    / f"{row['id']}.wav"
+                )
+                write_audio(output_path, output)
             output_si_sdr = si_sdr(clean.samples, output.samples)
             output_stoi = stoi(
                 clean.samples,

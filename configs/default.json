@@ -19,7 +19,7 @@
     "noise_floor_rise_smoothing": 0.98,
     "noise_floor_fall_smoothing": 0.8,
     "threshold_on_db": 12.0,
-    "threshold_off_db": 9.0,
+    "threshold_off_db": 6.0,
     "onset_frames": 2,
     "minimum_speech_ms": 100,
     "hangover_ms": 200,
@@ -27,7 +27,7 @@
   },
   "enhancement": {
     "alpha_dd": 0.92,
-    "gain_floor": 0.30,
+    "gain_floor": 0.20,
     "mcra_alpha_d": 0.95,
     "mcra_alpha_p": 0.2,
     "mcra_alpha_s": 0.8,
@@ -39,11 +39,11 @@
     "speech_absence_prior_max": 0.95
   },
   "statistical_vad": {
-    "alpha_dd": 0.96,
-    "score_threshold_on": 20.0,
-    "score_threshold_off": 10.0,
+    "alpha_dd": 0.98,
+    "score_threshold_on": 0.80,
+    "score_threshold_off": 0.79,
     "frequency_range_hz": [80, 4000],
-    "note": "Smoke-dev selected; re-tune only on a larger dev split before final reporting."
+    "note": "Selected on the 20-speaker development VAD mixtures and frozen before evaluation on the disjoint 8-speaker validation mixtures."
   },
   "external_vad": {
     "webrtc_aggressiveness": 3,
