@@ -111,8 +111,11 @@ def main() -> None:
             results.append(
                 {
                     "file_id": row["id"],
+                    "speaker_id": row.get("speaker_id", "unknown"),
                     "method": method,
                     "split": row.get("split", "unknown"),
+                    "noise": row.get("noise", "unknown"),
+                    "snr_db": row.get("snr_db", "unknown"),
                     "alpha_dd": arguments.alpha_dd,
                     "gain_floor": arguments.gain_floor,
                     "gain_decrease_smoothing": arguments.gain_decrease_smoothing,

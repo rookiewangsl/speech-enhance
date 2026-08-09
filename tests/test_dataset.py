@@ -11,6 +11,7 @@ from speech_frontend.dataset import (
     PairedUtterance,
     discover_voicebank_pairs,
     resample_aligned_pair,
+    read_voicebank_condition_log,
     safe_extract_wav_zip,
     sample_manifest_rows_by_speaker,
     split_pairs_by_speaker,
@@ -91,6 +92,24 @@ def test_sample_manifest_rows_is_balanced_and_reproducible() -> None:
     }
     assert counts == {"p1": 2, "p2": 2, "p3": 2}
     assert sampled == repeated
+
+
+def test_read_voicebank_condition_log(tmp_path: Path) -> None:
+    archive = tmp_path / "logs.zip"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr(
+            "log_trainset_28spk.txt",
+            "p001_001 babble 15\np001_002 cafe 0\n",
+        )
+
+    conditions = read_voicebank_condition_log(
+        archive, "log_trainset_28spk.txt"
+    )
+
+    assert conditions == {
+        "p001_001": {"noise": "babble", "snr_db": 15.0},
+        "p001_002": {"noise": "cafe", "snr_db": 0.0},
+    }
 
 
 def test_discover_rejects_unmatched_files(tmp_path: Path) -> None:

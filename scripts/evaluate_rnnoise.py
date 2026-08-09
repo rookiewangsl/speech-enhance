@@ -196,6 +196,8 @@ def main() -> None:
             "file_id": manifest_row["id"],
             "speaker_id": manifest_row.get("speaker_id", "unknown"),
             "split": manifest_row.get("split", "unknown"),
+            "noise": manifest_row.get("noise", "unknown"),
+            "snr_db": manifest_row.get("snr_db", "unknown"),
             "method": "R3_official_rnnoise_c_api_streaming",
             "chunk_size": arguments.chunk_size,
             "input_si_sdr_db": input_si_sdr,

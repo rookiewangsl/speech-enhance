@@ -197,7 +197,10 @@ def main() -> None:
             rows.append(
                 {
                     "file_id": manifest_row["id"],
+                    "speaker_id": manifest_row.get("speaker_id", "unknown"),
                     "split": manifest_row.get("split", "unknown"),
+                    "noise": manifest_row.get("noise", "unknown"),
+                    "snr_db": manifest_row.get("snr_db", "unknown"),
                     "method": method,
                     "input_si_sdr_db": input_si_sdr,
                     "output_si_sdr_db": output_si_sdr,

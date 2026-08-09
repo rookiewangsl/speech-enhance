@@ -160,6 +160,34 @@ def sample_manifest_rows_by_speaker(
     return sampled
 
 
+def read_voicebank_condition_log(
+    archive: str | Path, member_name: str
+) -> dict[str, dict[str, str | float]]:
+    """Read official VoiceBank noise/SNR metadata from ``logfiles.zip``."""
+
+    conditions: dict[str, dict[str, str | float]] = {}
+    with zipfile.ZipFile(archive) as source:
+        lines = source.read(member_name).decode("utf-8").splitlines()
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        fields = line.split()
+        if len(fields) != 3:
+            raise ValueError(
+                f"invalid condition log line {line_number}: {line!r}"
+            )
+        utterance_id, noise, snr_text = fields
+        if utterance_id in conditions:
+            raise ValueError(f"duplicate condition entry: {utterance_id}")
+        conditions[utterance_id] = {
+            "noise": noise,
+            "snr_db": float(snr_text),
+        }
+    if not conditions:
+        raise ValueError("condition log is empty")
+    return conditions
+
+
 def resample_aligned_pair(
     clean: AudioData,
     noisy: AudioData,
