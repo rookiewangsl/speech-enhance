@@ -5,8 +5,9 @@ __pycache__/
 *.egg-info/
 build/
 third_party/rnnoise/
-data/raw/
-data/processed/
+data/raw
+data/processed
+data/*.backup/
 outputs/audio/
 outputs/plots/
 outputs/metrics/
