@@ -207,7 +207,7 @@ features[64]      1 维归一化 pitch period
 
 ## 6. 神经网络结构
 
-![RNNoise网络结构与DSP处理链](../figures/rnnoise_network_architecture.svg)
+![RNNoise网络结构与DSP处理链](../figures/rnnoise_network_architecture.png)
 
 上图将神经网络主干与前后的确定性 DSP 链路分开显示。橙色区域是预训练神经网络，蓝色
 区域负责声学特征提取和波形重建，虚线框表示必须跨 10 ms 帧持续保存的神经网络状态。
