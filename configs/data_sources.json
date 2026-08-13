@@ -34,5 +34,18 @@
       }
     ],
     "split_note": "The official 28-speaker training partition is deterministically split into 20 development and 8 validation speakers. The two official test speakers are kept separate in the current protocol, but were used during earlier route exploration and are therefore not claimed as a pristine blind test."
+  },
+  "vctk_transcripts": {
+    "official_page": "https://datashare.ed.ac.uk/handle/10283/3443",
+    "version": "0.92",
+    "license": "CC-BY-4.0",
+    "archive": {
+      "filename": "VCTK-Corpus-0.92.zip",
+      "url": "https://datashare.ed.ac.uk/bitstreams/535f4286-e54c-4038-838c-a02285e32cb2/download",
+      "bytes": 11747302977,
+      "official_md5": "8a6ba2946b36fcbef0212cad601f4bfa",
+      "sha256": "f96258be9fdc2cbff6559541aae7ea4f59df3fcaf5cf963aae5ca647357e359c"
+    },
+    "usage_note": "Only official human transcripts are used as ASR references. VoiceBank utterance IDs are mapped strictly to VCTK speaker directories and transcript stems; clean-audio ASR output is never used as a reference. The full archive and extracted source remain on external storage and are not committed."
   }
 }

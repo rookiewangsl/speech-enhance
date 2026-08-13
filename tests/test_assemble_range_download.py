@@ -38,3 +38,23 @@ def test_assemble_segments_rejects_wrong_total(tmp_path: Path) -> None:
         MODULE.assemble_segments(
             [segment], tmp_path / "assembled.zip", expected_bytes=100
         )
+
+
+def test_assemble_slices_ignores_extra_tail_bytes(tmp_path: Path) -> None:
+    original = tmp_path / "original.zip"
+    with zipfile.ZipFile(original, "w") as archive:
+        archive.writestr("sample.txt", "slice-aware assembly")
+    payload = original.read_bytes()
+    split = len(payload) // 2
+    first = tmp_path / "first.part"
+    second = tmp_path / "second.part"
+    first.write_bytes(payload[:split] + b"ignored-tail")
+    second.write_bytes(payload[split:] + b"also-ignored")
+
+    output = MODULE.assemble_slices(
+        [(first, split), (second, len(payload) - split)],
+        tmp_path / "assembled.zip",
+        expected_bytes=len(payload),
+    )
+
+    assert output.read_bytes() == payload

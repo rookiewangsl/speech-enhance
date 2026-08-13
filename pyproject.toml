@@ -25,6 +25,10 @@ external = [
 demo = [
     "sounddevice>=0.5",
 ]
+asr = [
+    "openai-whisper==20250625",
+    "torch==2.13.0",
+]
 dev = [
     "pytest>=8.0",
 ]

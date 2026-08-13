@@ -1,6 +1,6 @@
 # 运行与 Demo 使用说明
 
-最后更新：2026-08-09
+最后更新：2026-08-14
 
 本文只维护安装、运行、输出检查和 Demo 评价方法。算法原理见
 [`02_项目模块与贡献边界.md`](02_项目模块与贡献边界.md)和
@@ -367,3 +367,63 @@ afplay outputs/mic_demo/microphone_rnnoise.wav
 
 固定 Demo 的试听顺序仍是 `clean reference → noisy input → R3 → C1`。完整数据结果不要求播放
 3,224 条音频；面试时增加一页 condition 表，主动说明 high-SNR 和 babble 失败即可。
+
+## 10. 固定 Whisper ASR 评测
+
+ASR 使用独立环境；模型权重和可重建的大体积 WAV 都放在 T7，不进入 Git：
+
+```bash
+python3.12 -m venv .venv-asr
+./.venv-asr/bin/pip install -e '.[asr]'
+```
+
+冻结协议见
+[`11_ASR后端与识别评测方案.md`](11_ASR后端与识别评测方案.md)。VCTK 解压后先严格映射
+官方 transcript；该步骤只保存 raw reference，统一规范化在 Whisper 转写进程内完成：
+
+```bash
+./.venv/bin/python scripts/prepare_asr_references.py \
+  --manifest data/manifests/development.jsonl \
+  --manifest data/manifests/validation.jsonl \
+  --manifest data/manifests/official_test.jsonl \
+  --transcript-root /Volumes/T7/ProjectData/realtime_speech_enhancement/data/raw/vctk_0.92/extracted/txt \
+  --output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/references.jsonl \
+  --audit-output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/reference_audit.json
+```
+
+以 validation 为例，先生成四路缓存音频：
+
+```bash
+./.venv/bin/python scripts/export_asr_inputs.py \
+  --manifest data/manifests/validation.jsonl \
+  --project-root . \
+  --output-root /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_inputs
+```
+
+然后用 CPU + FP32 转写。当前本机 MPS probe 的 normalized hypothesis 与 CPU 不一致，因此
+正式命令不得把 `--device cpu` 改为 `mps`：
+
+```bash
+./.venv-asr/bin/python scripts/evaluate_asr.py \
+  --inputs /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_inputs/manifests/validation_asr_inputs.jsonl \
+  --references /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/references.jsonl \
+  --config configs/asr_whisper_small_en.json \
+  --project-root . \
+  --model-root /Volumes/T7/ProjectData/realtime_speech_enhancement/models/whisper \
+  --output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/hypotheses.jsonl \
+  --cache-root /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/cache \
+  --environment-output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/environment.json \
+  --device cpu
+```
+
+最后生成 corpus WER、S/D/I、RTF、noise/SNR/speaker 分层和相对 noisy 的配对 bootstrap 区间：
+
+```bash
+./.venv/bin/python scripts/summarize_asr_metrics.py \
+  --input /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/hypotheses.jsonl \
+  --output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/summary.json \
+  --utterance-output /Volumes/T7/ProjectData/realtime_speech_enhancement/outputs/asr/asr_whisper_small_en_v1/validation_cpu/per_utterance.jsonl
+```
+
+以上入口均支持安全失败或原子落盘；音频导出和 Whisper 转写还会验证缓存身份。重跑时只有源
+音频摘要、增强配置摘要、ASR 配置摘要、reference 摘要和模型摘要全部匹配，才会复用结果。

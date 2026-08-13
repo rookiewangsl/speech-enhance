@@ -1,4 +1,5 @@
 .venv/
+.venv-asr/
 .DS_Store
 __pycache__/
 .pytest_cache/
@@ -44,4 +45,5 @@ outputs/rnnoise_continuity_dev30/metrics/**
 !outputs/rnnoise_continuity_dev30/metrics/continuity_metrics.csv
 !outputs/rnnoise_continuity_dev30/metrics/continuity_summary.json
 *.wav
+*.pt
 *.zip

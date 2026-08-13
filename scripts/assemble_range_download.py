@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import shutil
 import zipfile
 from pathlib import Path
+from typing import BinaryIO
 
 
 def sha256(path: Path) -> str:
@@ -15,6 +15,61 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(4 * 1024**2), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _copy_exact(source: BinaryIO, destination: BinaryIO, length: int) -> None:
+    remaining = length
+    while remaining:
+        chunk = source.read(min(4 * 1024**2, remaining))
+        if not chunk:
+            raise OSError(f"segment ended with {remaining} bytes still required")
+        destination.write(chunk)
+        remaining -= len(chunk)
+
+
+def assemble_slices(
+    slices: list[tuple[Path, int]], output: Path, *, expected_bytes: int
+) -> Path:
+    """Atomically assemble exact prefixes of ordered files and verify ZIP CRC."""
+
+    if not slices:
+        raise ValueError("no slices were supplied")
+    if any(length <= 0 for _, length in slices):
+        raise ValueError("slice lengths must be positive")
+    missing = [path for path, _ in slices if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"missing slices: {missing}")
+    undersized = [
+        (path, length, path.stat().st_size)
+        for path, length in slices
+        if path.stat().st_size < length
+    ]
+    if undersized:
+        raise ValueError(f"slice files are too short: {undersized}")
+    actual_bytes = sum(length for _, length in slices)
+    if actual_bytes != expected_bytes:
+        raise ValueError(
+            f"slice bytes mismatch: expected {expected_bytes}, got {actual_bytes}"
+        )
+
+    temporary = output.with_suffix(output.suffix + ".assembling")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with temporary.open("wb") as destination:
+            for path, length in slices:
+                with path.open("rb") as source:
+                    _copy_exact(source, destination, length)
+        if temporary.stat().st_size != expected_bytes:
+            raise OSError("assembled archive size changed unexpectedly")
+        with zipfile.ZipFile(temporary) as archive:
+            bad_member = archive.testzip()
+            if bad_member is not None:
+                raise ValueError(f"ZIP CRC check failed for {bad_member}")
+        temporary.replace(output)
+        return output
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def assemble_segments(
@@ -33,20 +88,11 @@ def assemble_segments(
             f"segment bytes mismatch: expected {expected_bytes}, got {actual_bytes}"
         )
 
-    temporary = output.with_suffix(output.suffix + ".assembling")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with temporary.open("wb") as destination:
-        for path in segments:
-            with path.open("rb") as source:
-                shutil.copyfileobj(source, destination, length=4 * 1024**2)
-    if temporary.stat().st_size != expected_bytes:
-        raise OSError("assembled archive size changed unexpectedly")
-    with zipfile.ZipFile(temporary) as archive:
-        bad_member = archive.testzip()
-        if bad_member is not None:
-            raise ValueError(f"ZIP CRC check failed for {bad_member}")
-    temporary.replace(output)
-    return output
+    return assemble_slices(
+        [(path, path.stat().st_size) for path in segments],
+        output,
+        expected_bytes=expected_bytes,
+    )
 
 
 def main() -> None:
