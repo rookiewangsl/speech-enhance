@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "protocol_version": "asr_whisper_small_en_robust_v2",
+  "base_protocol": {
+    "protocol_version": "asr_whisper_small_en_v1",
+    "config_digest": "5d54b8dab43b78dfe56f3b704a094623c33c9dba3dbe7a1f8bd88a5d63f2f464",
+    "model_sha256": "f953ad0fd29cacd07d5a9eda5624af0f6bcf2258be67c92b79389873d91e0872",
+    "device": "cpu"
+  },
+  "detector": {
+    "compression_ratio_threshold": 2.4,
+    "logprob_threshold": -1.0,
+    "repetition_ngram_size": 4,
+    "repeated_ngram_fraction_threshold": 0.5,
+    "repetition_min_words": 12,
+    "max_words_per_second": 8.0,
+    "token_limit": 224,
+    "token_limit_fraction": 0.95,
+    "no_speech_conflict_threshold": 0.8,
+    "no_speech_conflict_min_words": 5,
+    "timestamp_check_enabled": false,
+    "timestamp_tolerance_seconds": 0.05,
+    "require_segment_metadata": true
+  },
+  "retry": {
+    "temperatures": [0.2, 0.4, 0.6],
+    "best_of": 5,
+    "seed_namespace": "asr_whisper_small_en_robust_v2",
+    "warmup": true
+  },
+  "fallback": {
+    "eligible_conditions": ["mcra_dd_wiener", "rnnoise_r3"],
+    "source_condition": "noisy"
+  },
+  "selection": {
+    "enhanced_retry_requires_noisy_consistency": true,
+    "max_retry_noisy_word_distance": 0.4
+  },
+  "abstention": {
+    "enabled": true
+  },
+  "normalization": {
+    "implementation": "whisper.normalizers.EnglishTextNormalizer"
+  }
+}
