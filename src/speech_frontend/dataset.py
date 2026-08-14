@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import random
 import shutil
 import stat
@@ -157,6 +158,59 @@ def sample_manifest_rows_by_speaker(
         candidates = sorted(grouped[speaker_id], key=lambda row: str(row["id"]))
         random.Random(f"{seed}:{speaker_id}").shuffle(candidates)
         sampled.extend(candidates[:items_per_speaker])
+    return sampled
+
+
+def sample_manifest_rows_by_strata(
+    rows: list[dict[str, Any]],
+    *,
+    fields: tuple[str, ...],
+    items_per_stratum: int,
+    seed: int = 20260724,
+) -> list[dict[str, Any]]:
+    """Take a deterministic nested sample from every requested stratum.
+
+    Candidates are ranked by a stable hash of ``seed`` and utterance id. Taking
+    ``k+1`` items therefore always contains the sample obtained with ``k``.
+    """
+
+    if not fields or len(set(fields)) != len(fields):
+        raise ValueError("fields must be non-empty and unique")
+    if items_per_stratum <= 0:
+        raise ValueError("items_per_stratum must be positive")
+    grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    seen_ids: set[str] = set()
+    for row in rows:
+        utterance_id = row.get("id")
+        if not isinstance(utterance_id, str) or not utterance_id:
+            raise ValueError("each manifest row must have a non-empty id")
+        if utterance_id in seen_ids:
+            raise ValueError(f"duplicate utterance id: {utterance_id}")
+        missing = [field for field in fields if field not in row]
+        if missing:
+            raise ValueError(f"manifest row missing stratification fields: {missing}")
+        key = tuple(row[field] for field in fields)
+        grouped.setdefault(key, []).append(row)
+        seen_ids.add(utterance_id)
+    if not grouped:
+        raise ValueError("manifest has no rows")
+
+    sampled: list[dict[str, Any]] = []
+    for key in sorted(grouped, key=lambda value: tuple(map(str, value))):
+        candidates = grouped[key]
+        if len(candidates) < items_per_stratum:
+            raise ValueError(
+                f"stratum {key!r} has {len(candidates)} rows; "
+                f"requires {items_per_stratum}"
+            )
+        ranked = sorted(
+            candidates,
+            key=lambda row: (
+                hashlib.sha256(f"{seed}\0{row['id']}".encode()).digest(),
+                str(row["id"]),
+            ),
+        )
+        sampled.extend(ranked[:items_per_stratum])
     return sampled
 
 

@@ -7,7 +7,7 @@
 
 当前默认听感 Demo 使用 RNNoise R3，但项目结论不是“RNNoise 全场景最优”：它在低 SNR、
 非语音型噪声上抑制更强，在 high-SNR 和 babble 条件会过处理目标语音。固定 Whisper
-`small.en` 的初步 ASR 结果进一步表明，感知降噪改善不等于 WER 改善。
+`small.en` 的未见说话人分层 ASR 结果进一步表明，感知降噪改善不等于 WER 改善。
 
 ## 当前状态
 
@@ -18,23 +18,28 @@
 | official test 824 对增强补充评测 | 完成；历史接触过，不称完全盲测 |
 | RNNoise 48/16 kHz persistent-state 流式适配 | 完成 |
 | 固定 Whisper v1/v2 管线、缓存和评分 | 完成 |
-| ASR `development_balanced_5` 100 条、四路评测 | 完成 |
-| ASR development/validation full | 尚未运行 |
+| ASR development balanced 100 条、四路评测 | 完成；管线验收与故障定位 |
+| ASR validation 分层 320 条、四路 v1/v2 | 完成；8 speaker × 10 noise × 4 SNR |
+| ASR development/validation full | 未运行；当前停止扩样 |
 | VCTK transcript 12,396 条结构映射 | 完成；人工听辨抽查待完成 |
 
-ASR balanced 子集上的 corpus WER：
+ASR validation 分层 320 条（四路 1,280 输入）上的 v1 corpus WER：
 
 | 输入或策略 | WER |
 |---|---:|
-| clean | `2.28%` |
-| noisy | `5.65%` |
-| MCRA + DD-Wiener | `5.51%` |
-| RNNoise v1 固定解码 | `40.99%` |
-| RNNoise v2 灾难保护 | `14.11%` |
-| RNNoise/noisy reference oracle | `4.57%`，不可部署 |
+| clean | `1.57%` |
+| noisy | `5.99%` |
+| MCRA + DD-Wiener | `6.58%`；相对 noisy `+0.59 pp`，区间跨零 |
+| RNNoise v1 固定解码 | `14.60%`；相对 noisy `+8.61 pp` |
+| RNNoise v2 灾难保护 | `11.93%` selective WER；coverage `99.69%` |
+| RNNoise/noisy reference oracle | `5.13%`，不可部署 |
 
-这 100 条只是管线验收和问题定位，不是最终 ASR 主实验结论。下一步应依次运行
-development full 和冻结后的 validation full。
+RNNoise v1 的 paired bootstrap 95% CI 为 `+5.90` 到 `+11.55 pp`；8/8 个说话人、所有
+leave-one-speaker-out、去掉影响最大样本以及 babble/非 babble 分组均保持“比 noisy 更差”。
+这已满足当前预设的最小计算停止条件，因此暂不扩到 full。它支持本数据与固定 Whisper
+协议下的结论，不外推到所有 ASR 后端。MCRA 的区间跨零，仍只能称“未证明有收益”。
+RNNoise/noisy reference oracle 也只把 WER 从 `5.99%` 降到 `5.13%`（最多减少 22 个词错误）；
+考虑真实 router 必然低于 oracle 且增加双路推理成本，当前不把重新设计 router 作为近期主线。
 
 ## 项目手册
 

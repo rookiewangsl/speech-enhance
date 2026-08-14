@@ -14,6 +14,7 @@ from speech_frontend.dataset import (
     read_voicebank_condition_log,
     safe_extract_wav_zip,
     sample_manifest_rows_by_speaker,
+    sample_manifest_rows_by_strata,
     split_pairs_by_speaker,
     split_pairs_by_speaker_count,
 )
@@ -92,6 +93,46 @@ def test_sample_manifest_rows_is_balanced_and_reproducible() -> None:
     }
     assert counts == {"p1": 2, "p2": 2, "p3": 2}
     assert sampled == repeated
+
+
+def test_stratified_sample_is_balanced_reproducible_and_nested() -> None:
+    rows = [
+        {
+            "id": f"{speaker}_{noise}_{snr}_{index}",
+            "speaker_id": speaker,
+            "noise": noise,
+            "snr_db": snr,
+        }
+        for speaker in ("p1", "p2")
+        for noise in ("babble", "car")
+        for snr in (0.0, 5.0)
+        for index in range(3)
+    ]
+    fields = ("speaker_id", "noise", "snr_db")
+    first = sample_manifest_rows_by_strata(
+        rows, fields=fields, items_per_stratum=1, seed=7
+    )
+    second = sample_manifest_rows_by_strata(
+        rows, fields=fields, items_per_stratum=2, seed=7
+    )
+    repeated = sample_manifest_rows_by_strata(
+        list(reversed(rows)), fields=fields, items_per_stratum=1, seed=7
+    )
+
+    assert len(first) == 8
+    assert len(second) == 16
+    assert {row["id"] for row in first} <= {row["id"] for row in second}
+    assert first == repeated
+
+
+def test_stratified_sample_rejects_underfilled_stratum() -> None:
+    rows = [{"id": "u1", "speaker_id": "p1", "noise": "car", "snr_db": 0.0}]
+    with pytest.raises(ValueError, match="requires 2"):
+        sample_manifest_rows_by_strata(
+            rows,
+            fields=("speaker_id", "noise", "snr_db"),
+            items_per_stratum=2,
+        )
 
 
 def test_read_voicebank_condition_log(tmp_path: Path) -> None:

@@ -9,11 +9,14 @@
 | 增强 validation | 3,224 对、8 个未见 speaker | 完成 | 是，当前主要增强证据 |
 | 增强 official test | 824 对、2 个 speaker | 完成 | 补充；历史接触过 |
 | ASR balanced | 100 utterances × 4 路 = 400 输入 | 完成 | 只作管线验收和问题定位 |
+| ASR validation stratified | 320 × 4 = 1,280 输入；8 speaker × 10 noise × 4 SNR | 完成 | 当前固定后端主验证证据 |
 | ASR development full | 8,348 × 4 = 33,392 输入 | 未运行 | 否 |
 | ASR validation full | 3,224 × 4 = 12,896 输入 | 未运行 | 否 |
 | ASR official test | 824 × 4 = 3,296 输入 | 未运行 | 否 |
 
-因此“RNNoise 的增强全量结果”已经成立，但“RNNoise 对固定 ASR 的最终影响”尚未完成。
+因此“RNNoise 的增强全量结果”已经成立；对固定 Whisper 的方向性结论也已在 320 条未见
+speaker 分层样本上通过预设稳定性检查。它不是 validation full 的自然分布精确估计，也不能
+外推到所有 ASR 后端。
 
 ## 2. 增强主结论
 
@@ -117,9 +120,38 @@ ASR RTF 为 `6.196`。音频长度、16 kHz、文件 SHA、延迟补偿和缓存
 
 balanced 分层表明 babble 和低 SNR 都有影响：babble 9 条中 7 条 RNNoise WER 变差、没有
 一条变好；非 babble 的 0–5 dB 也从 noisy `8.75%` 上升到 RNNoise `16.25%`。两者交互时
-最容易出现灾难性重复，但系统性结论仍需 full 复验。
+最容易出现灾难性重复。后续 validation 分层实验进一步检验了系统性。
 
-## 6. v2 灾难保护
+## 6. validation 分层 320 条主验证
+
+冻结 seed `20260724` 后，从每个 `speaker×noise×SNR` stratum 确定性抽 1 条：8 个未见
+speaker、10 种 noise、4 个 SNR，共 320 utterances、2,555 个 reference words。四路均完整
+运行，v1 结果为：
+
+| Condition | S / D / I | WER | 相对 paired noisy | paired bootstrap 95% CI |
+|---|---:|---:|---:|---:|
+| clean | `27 / 4 / 9` | `1.57%` | `-4.42 pp` | — |
+| noisy | `98 / 16 / 39` | `5.99%` | `0.00 pp` | — |
+| MCRA + DD-Wiener | `115 / 32 / 21` | `6.58%` | `+0.59 pp` | `[-0.81,+1.87] pp` |
+| RNNoise R3 v1 | `204 / 88 / 81` | `14.60%` | `+8.61 pp` | `[+5.90,+11.55] pp` |
+
+RNNoise v1 只有 1 条 high-compression 解码异常，因此总体退化不再由重复输出离群点支配。
+稳定性结果为：
+
+- 8/8 个 speaker 的 RNNoise WER 都高于各自 paired noisy；
+- leave-one-speaker-out 8 次全部保持同方向；
+- 去掉影响最大的 `p226_001 / babble / 15 dB` 后，差值仍为 `+7.88 pp`；
+- babble 差值为 `+47.67 pp`，非 babble 仍为 `+4.22 pp`；
+- bootstrap 区间完全高于零。
+
+所以低 SNR 不是唯一原因，babble 也不是唯一原因：babble 会显著放大问题，但在非 babble
+条件下 RNNoise 仍系统性损害该固定后端。上述检查满足当前最小计算停止条件，不继续扩到 640
+或 full。MCRA 的区间跨零；虽然 6/8 speaker 更差，但现有证据只能说“没有证明优于 noisy”，
+不能宣称等价或必然更差。
+
+## 7. v2 灾难保护
+
+### 7.1 development balanced 诊断
 
 v2 不覆盖 v1，也不读取人工 reference 做运行时决策：
 
@@ -148,14 +180,46 @@ v2 修复了 `p231_046` 和 `p244_166` 两个触发样本，均回退 noisy。�
 65.57% 错误，但 `v2-noisy` 95% CI 仍为 `[3.47,14.35] pp`，不能称优于 noisy。
 
 这里的 oracle 不是 clean ASR。它使用人工 reference，逐 utterance 事后选择 RNNoise/noisy
-两路中词错误更少者，因此不可部署。其 `4.57%` 说明 RNNoise 在部分样本上有条件价值，缺失
-的是可靠的 reference-free router。
+两路中词错误更少者，因此不可部署。balanced 子集上的 `4.57%` 只说明 RNNoise 在部分样本上
+有条件价值；是否值得设计 router 必须由规模更大、离群点不主导的 oracle 上限决定。
 
 以“condition 错误数大于 paired noisy”为 harmful 标签，RNNoise 共有 27 条 harmful；当前
 detector 命中 2、漏掉 25，precision `100%`、recall `7.41%`。它能抓明显解码崩溃，不能抓
 所有形态正常但语义错误的增强损伤。
 
-## 7. 工业 ASR 是否加降噪前端
+### 7.2 validation 分层主验证
+
+同一冻结 v2 在 validation 320 上触发 14/1,280 条结果，其中 RNNoise 触发 10 条：9 条回退
+paired noisy，1 条 abstain。RNNoise v2 在 319/320 coverage 下 selective WER 为 `11.93%`；
+在相同 accepted subset 上 paired noisy 为 `5.69%`，差值仍为 `+6.24 pp`。8/8 speaker、全部
+leave-one-speaker-out 和 babble/非 babble 仍同向更差。detector precision `80%`、recall
+`10%`，说明它降低已识别灾难的损失，却无法路由多数“形态正常、内容错误”的退化。
+
+v2 的完整缓存复跑为 1,280/1,280 final cache hits、`retry_inferences=0`、`model_loads=0`；v1
+同样为 1,280/1,280 cache hits，验证了中断续跑路径。
+
+### 7.3 oracle 上限与 router 决策
+
+Validation 320 上，paired noisy 有 153 个词错误、WER `5.99%`；RNNoise/noisy reference
+oracle 有 131 个错误、WER `5.13%`。即使逐条提前知道答案，最多也只减少 22 个错误：绝对
+改善 `0.86 pp`，相对 WER 下降约 `14.4%`。这不是零收益，但属于偏小的理论上限。
+
+真实 router 不知道 reference，效果必然低于 oracle，还可能需要 raw/enhanced 双路 ASR、置信
+校准和额外延迟。当前 v2 已证明简单异常检测远不足以逼近 oracle：它的 selective WER 仍为
+`11.93%`。同时，无条件 RNNoise 的损失 `+8.61 pp` 远大于 oracle 的最大收益 `-0.86 pp`，
+收益与风险明显不对称。
+
+这不等于“所有前端都没有意义”。Clean WER 为 `1.57%`，说明 noisy 到理想语音之间仍有较大
+识别空间；结论只是当前 RNNoise 没有把这部分空间转化成可路由收益。它仍可服务人工监听，
+而 AEC、beamforming、ASR-aware enhancement 或其他后端也可能得到不同结果。
+
+因此当前不重新设计复杂 router，也不为此启动 development/full ASR。若未来更换增强器或
+ASR 后 oracle 空间显著增大，可采用一个简化方向：保留 raw 为默认路径，用增强前后语音保留
+特征、校准后的 ASR confidence 和两路 hypothesis 差异训练成本敏感的小型分类器；标签只在
+development 上由人工 reference 的逐条 WER 胜负产生，并以最终 WER、coverage、routing
+regret 和额外 RTF 评估。相比事后路由，更值得优先研究的是 ASR-aware enhancement 或联合优化。
+
+## 8. 工业 ASR 是否加降噪前端
 
 会，但通常是可配置的 capture front end，而不是无条件串接一个固定 RNNoise。
 
@@ -197,22 +261,35 @@ ASR loss、动态增强强度或混回部分 observation 能缓解失配。
 ASR 默认：noisy/raw
 人工监听和默认降噪 Demo：RNNoise R3
 保守 ASR 前端候选：MCRA + DD-Wiener
-RNNoise→ASR：只在 full WER 验证或可靠 router 允许时启用
+RNNoise→ASR：当前禁止无条件启用
+复杂 router：当前不投入；更换增强器/ASR 且 oracle 空间明显增大后再评估
 ```
 
-## 8. 全量 ASR 计划
+## 9. 扩样与全量 ASR 计划
+
+当前采用逐级扩样而非直接全量：先以全部 8 个 validation speaker、全部 noise/SNR 的 320 条
+分层样本判断方向；只有 CI 跨零、speaker 方向不稳、leave-one-out 翻转或 babble/非 babble
+结论冲突时才增加为每 stratum 2 条（640）。RNNoise v1 已通过停止条件，因此暂不扩样。
+
+下面的 full 路线保留给“需要精确估计自然语料总体 WER”或“更换 ASR/增强后重新验证”
+的情形。
 
 ### 阶段一：development full
 
-运行 `8,348×4=33,392` 路 v1，再复用 v1 运行 v2。目标是稳定估计总体、noise、SNR、speaker、
-错误类型、重复长尾、detector precision/recall 和 oracle 空间。
+若未来确有需要，运行 `8,348×4=33,392` 路 v1，再复用 v1 运行 v2，用于精确估计总体、
+noise、SNR、speaker、错误类型和 oracle 空间。当前 oracle 上限不足以支持仅为 router 启动该
+计算。
 
-v1 永不修改。若根据 development full 改进 router，必须创建 `v2.1`，不能覆盖 v2。
+v1 永不修改。未来任何基于现有结果的新策略都必须使用新协议名，不能覆盖 v1/v2。
 
 ### 阶段二：validation full
 
 在 8 个未见 speaker 的 `3,224×4=12,896` 路上一次性确认。进入前冻结模型、配置、normalizer、
-阈值、router 和汇总规则；validation 上不再调参。这一 split 是最终 ASR 泛化主证据。
+候选策略和汇总规则；validation 上不再调参。这一 split 是最终 ASR 泛化主证据。
+
+当前 v2 是在查看 320 条 validation 结果之前冻结的，且查看后不再修改。若未来根据这 320 条
+创建 v2.1，则 validation 已参与设计：即使再跑剩余样本，也必须披露这一点，不能称完全未见
+确认；严格确认应另用预注册的新 corpus/后端或保留的新 holdout。
 
 ### 阶段三：official test
 
@@ -221,7 +298,7 @@ v1 永不修改。若根据 development full 改进 router，必须创建 `v2.1`
 按 balanced 平均时长和 CPU RTF 粗估：development v1 约 15–17 小时，validation 约 6–7 小时，
 official test 约 1.5–2 小时。v2 复用 v1，只对触发样本新增推理。
 
-## 9. partition 如何比较
+## 10. partition 如何比较
 
 当前没有训练 Whisper/RNNoise，因此 development 不是“ASR 训练集”，而是诊断和阈值开发集。
 
@@ -238,24 +315,28 @@ noisy 直接相减。
 三个 split 的 micro-average 可以作为附加统计，但不能代替分 split 结果，因为 8,348 条
 development 会支配总数。
 
-如果未来训练 learned router、ASR-aware enhancement 或微调 Whisper，必须从 development
+如果未来训练新的前端、简化 router 或微调 Whisper，必须从 development
 内部再划分 train/dev，保持 validation 和 official test reference 完全不进入训练或阈值选择。
 
-## 10. 允许下的当前结论
+## 11. 允许下的当前结论
 
 可以说：
 
 - RNNoise 在增强 validation 上平均抑制更强，但 high-SNR/babble 明确失败；
 - MCRA + DD-Wiener 更保守，增强全量上正 SI-SDRi 比例更高；
-- 在固定 Whisper 的 100 条 development 子集上，MCRA 与 noisy 持平，RNNoise 明显更差；
-- v2 能限制检测到的灾难性重复，却尚未超过 noisy；
-- 全量 ASR 方向预计相似，但具体 WER 和显著性仍未知。
+- 在固定 Whisper 的 320 条未见 speaker 分层样本上，RNNoise v1 比 noisy 高 `8.61 pp` WER，
+  95% CI 为 `[+5.90,+11.55] pp`，且跨 speaker/去极值方向稳定；
+- MCRA 相对 noisy 为 `+0.59 pp`，但区间跨零，尚无收益证据；
+- v2 能限制检测到的灾难，却在 `99.69%` coverage 下仍比 paired noisy 高 `6.24 pp`；
+- RNNoise/noisy oracle 仅从 `5.99%` 降到 `5.13%`，理论上最多减少 22 个词错误，不足以支持
+  当前优先开发复杂 router；
+- 当前停止扩样是为了回答方向问题；full 才能提供自然 corpus 的更精确总体估计。
 
 不能说：
 
 - “RNNoise 普遍提高 ASR”；
-- “100 条已经代表 12,396 条”；
-- “oracle 4.57% 可以部署”；
+- “320 条分层样本等于 full 12,396 条或代表所有 ASR 后端”；
+- “oracle 5.13% 可以部署或保证 router 能获得同等收益”；
 - “official test 是完全盲测”；
 - “SI-SDR/STOI 改善证明 WER 必然改善”；
 - “一个 fixed Whisper 结果代表所有 ASR 后端”。
