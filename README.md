@@ -21,6 +21,7 @@
 | ASR development balanced 100 条、四路评测 | 完成；管线验收与故障定位 |
 | ASR validation 分层 320 条、四路 v1/v2 | 完成；8 speaker × 10 noise × 4 SNR |
 | ASR development/validation full | 未运行；当前停止扩样 |
+| DNSMOS P.835 本地评分与配对汇总 | 完成；validation 320 四路共 1,280 条 |
 | VCTK transcript 12,396 条结构映射 | 完成；人工听辨抽查待完成 |
 
 ASR validation 分层 320 条（四路 1,280 输入）上的 v1 corpus WER：
@@ -41,6 +42,12 @@ leave-one-speaker-out、去掉影响最大样本以及 babble/非 babble 分组�
 RNNoise/noisy reference oracle 也只把 WER 从 `5.99%` 降到 `5.13%`（最多减少 22 个词错误）；
 考虑真实 router 必然低于 oracle 且增加双路推理成本，当前不把重新设计 router 作为近期主线。
 
+同一批 320 条上的 DNSMOS 显示：RNNoise 相对 noisy 的 `SIG/BAK/OVRL` 平均分别提高
+`+0.251/+1.306/+0.615`，但 WER 同时从 `5.99%` 升至 `14.60%`。逐条看，RNNoise 的 OVRL
+在 307/320 条上提高，其中 73 条的 ASR 词错误反而增加；OVRL delta 与 ASR 词错误减少的
+Spearman 相关仅 `0.055`。因此 DNSMOS 用于无参考感知质量监测，不用作 ASR router 或前端
+选择标准。
+
 ## 项目手册
 
 手册压缩为五章：
@@ -60,6 +67,12 @@ python3 -m venv .venv
 ./.venv/bin/pip install -e '.[data,dev,evaluation,demo]'
 ./scripts/setup_rnnoise.sh
 ./.venv/bin/python -m pytest
+```
+
+无参考感知质量评分额外安装固定 ONNX Runtime：
+
+```bash
+./.venv/bin/python -m pip install -e '.[perceptual]'
 ```
 
 增强单个 16/48 kHz mono WAV：

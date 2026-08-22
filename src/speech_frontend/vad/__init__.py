@@ -5,6 +5,11 @@ from speech_frontend.vad.energy import (
     EnergyVADConfig,
     VADResult,
 )
+from speech_frontend.vad.endpoint import (
+    EndpointConfig,
+    EndpointSegment,
+    StreamingEndpointDetector,
+)
 from speech_frontend.vad.external import WebRTCVAD, WebRTCVADConfig
 from speech_frontend.vad.metrics import BinaryVADMetrics, binary_metrics, labels_from_intervals
 from speech_frontend.vad.synthetic import VADMixture, VADMixtureConfig, create_vad_mixture
@@ -14,8 +19,11 @@ __all__ = [
     "BinaryVADMetrics",
     "EnergyVAD",
     "EnergyVADConfig",
+    "EndpointConfig",
+    "EndpointSegment",
     "StatisticalVAD",
     "StatisticalVADConfig",
+    "StreamingEndpointDetector",
     "VADMixture",
     "VADMixtureConfig",
     "VADResult",

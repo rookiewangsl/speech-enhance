@@ -62,6 +62,52 @@ Babble 是明确失败条件：RNNoise mean SI-SDRi `-6.718 dB`，DD-Wiener 为 
 - R4 broadband noisy mixing 会重新引入结构噪声，保持关闭；
 - C1 不能恢复已删除的音素，只保留为负消融。
 
+### 2.4 DNSMOS P.835 的定位
+
+项目现已接入 Microsoft official regular DNSMOS P.835 本地模型，输出 `SIG/BAK/OVRL`，用于
+真实麦克风等无 clean reference 场景。冻结协议包括官方 commit、ONNX SHA、16 kHz、9.01 秒
+窗口、1 秒 hop、短音频重复策略、无幅度归一化和官方 polynomial calibration。
+
+Validation 分层 320 条的四路 1,280 个输入已全部完成。下表是条件均值，括号内为相对 paired
+noisy 的平均变化；delta 的 95% CI 除外说明均不跨零：
+
+| Condition | SIG | BAK | OVRL |
+|---|---:|---:|---:|
+| clean | `3.537 (+0.557)` | `4.047 (+1.564)` | `3.248 (+0.998)` |
+| noisy | `2.981` | `2.483` | `2.249` |
+| MCRA + DD-Wiener | `3.077 (+0.096)` | `2.794 (+0.311)` | `2.424 (+0.175)` |
+| RNNoise R3 | `3.232 (+0.251)` | `3.789 (+1.306)` | `2.865 (+0.615)` |
+
+RNNoise 的 BAK 和 OVRL 明显提高，说明它确实有“背景更干净、整体听感更好”的前端价值。
+但 SIG 的 paired delta 均值为 `+0.251`、中位数却为 `-0.034`：低 SNR 条件的大幅正收益把
+均值拉高，多数条件并不是一致改善。按 SNR 的 RNNoise 平均 delta 为：
+
+| SNR | ΔSIG | ΔBAK | ΔOVRL | ASR ΔWER |
+|---:|---:|---:|---:|---:|
+| 0 dB | `+0.709` | `+1.791` | `+0.915` | `+13.46 pp` |
+| 5 dB | `+0.298` | `+1.488` | `+0.721` | `+7.38 pp` |
+| 10 dB | `+0.064` | `+1.167` | `+0.519` | `+4.96 pp` |
+| 15 dB | `-0.067`，CI 跨零 | `+0.777` | `+0.306` | `+8.27 pp` |
+
+最关键的是逐条 DNSMOS–WER 对齐结果：
+
+| Frontend | ASR 受损条数 | OVRL 提高条数 | OVRL↑ 且 ASR 受损 | 占全部 ASR 受损 | OVRL delta 与 ASR error reduction Spearman |
+|---|---:|---:|---:|---:|---:|
+| MCRA + DD-Wiener | `20/320` | `245/320` | `17/320` | `85.0%` | `0.061` |
+| RNNoise R3 | `80/320` | `307/320` | `73/320` | `91.3%` | `0.055` |
+
+Babble 上的冲突尤其明显：RNNoise 的 SIG/OVRL 平均分别提高 `+0.401/+0.437`，但 WER 从
+`17.44%` 升到 `65.12%`；25 条 ASR 受损样本中有 20 条仍被 OVRL 判为改善。这与试听和频谱
+中观察到的目标音素、共振峰过渡被删除并不矛盾：DNSMOS 的 SIG 是感知语音质量代理，不是
+“文本内容是否完整”的度量，模型可能把更少的语音活动、更低的残余干扰评为更干净，却无法
+可靠惩罚对 ASR 至关重要的局部音素删除。
+
+因此 DNSMOS 回答感知质量，不回答 ASR 是否改善。它适合无 clean reference 的线上质量监测、
+场景分层和盲听样本筛选；不适合作为 ASR router、fallback 或前端选型的单独依据。只要 WER
+更差，ASR 默认路径仍保持 raw/noisy。结果必须与 paired WER 和人工试听联合解释。
+[Microsoft DNSMOS official implementation](https://github.com/microsoft/DNS-Challenge/tree/master/DNSMOS)、
+[DNSMOS P.835 paper](https://arxiv.org/abs/2110.01763)
+
 ## 3. ASR 研究问题与冻结 v1
 
 主问题是：

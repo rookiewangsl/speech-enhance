@@ -24,6 +24,8 @@
   paired noisy，且存在 `0.31%` abstention；
 - **router 的优先级**：RNNoise/noisy oracle 只比 noisy 低 `0.86 pp`，理论收益上限偏小，
   当前不投入复杂 router；
+- **DNSMOS 的定位**：validation 320 四路 1,280 条已完成；它确认 RNNoise 显著改善背景和
+  整体感知分，但逐条 delta 几乎不能预测 ASR 词错误变化，不替代 WER 或人工盲听；
 - **official test 边界**：项目早期使用过其中的样本，不能称完全盲测。
 
 当前最重要的结论是：
