@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "sample_rate": 16000,
+  "formal_backend": "nara_wpe",
+  "smoke_backend": "numpy_reference",
+  "n_fft": 512,
+  "win_length": 512,
+  "hop_length": 128,
+  "window": "hann",
+  "delay": 3,
+  "iterations": 3,
+  "psd_context": 0,
+  "statistics_mode": "full",
+  "dtype": "complex128",
+  "reference_channel": 0,
+  "conditions": ["raw", "s_wpe_10", "s_wpe_40", "m_wpe_10"],
+  "taps": {
+    "s_wpe_10": 10,
+    "s_wpe_40": 40,
+    "m_wpe_10": 10
+  },
+  "diagnostic_search": {
+    "trigger": "m_wpe_worse_on_dev_rt60_ge_0.6",
+    "delay": [2, 3, 4],
+    "m_wpe_taps": [5, 10, 20],
+    "iterations_fallback": 5,
+    "dev_utterances": 200
+  }
+}

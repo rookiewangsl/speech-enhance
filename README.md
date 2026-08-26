@@ -60,6 +60,35 @@ Spearman 相关仅 `0.055`。因此 DNSMOS 用于无参考感知质量监测，�
 
 总入口见 [项目手册索引](docs/handbook/README.md)。
 
+## 下一阶段：普通话混响鲁棒 ASR
+
+仓库计划在保留当前英文降噪实验和结论的基础上，新增普通话远场混响鲁棒 ASR 主线：使用
+可控四通道 RIR、单/多通道 WPE、Whisper LoRA 多条件训练和 paired CER 评测。当前详细方案见
+[普通话混响鲁棒 ASR：项目改造与实验计划](docs/robust_asr/00_普通话混响鲁棒ASR改造与实验计划.md)。
+
+已完成的范围、数据审计和冻结基线烟雾结果见
+[执行记录与复现](docs/robust_asr/01_执行记录与复现.md)。20 小时 LoRA 和正式 test 消融仍待
+Linux + RTX 4070 阶段执行；计划文档中的正式实验规模和性能数值仍不是已完成结果。
+
+无需下载数据即可校验冻结协议和运行合成 WPE smoke：
+
+```bash
+./.venv/bin/python scripts/robust_asr/validate_protocol.py
+./.venv/bin/python scripts/robust_asr/run_synthetic_wpe_smoke.py --seconds 0.4
+./.venv/bin/python -m pytest tests/test_robust_asr_*.py -q
+```
+
+在已挂载数据盘的环境中，可安装正式依赖并复现已完成的 manifest 与烟雾基线：
+
+```bash
+python3 -m venv .venv-robust-asr
+./.venv-robust-asr/bin/pip install -e '.[robust-asr,dev]'
+export ROBUST_ASR_DATA_ROOT=/path/to/robust_asr
+./.venv-robust-asr/bin/python scripts/robust_asr/prepare_aishell.py
+./.venv-robust-asr/bin/python scripts/robust_asr/run_frozen_whisper_baseline.py \
+  --device cpu --local-files-only
+```
+
 ## 快速开始
 
 ```bash

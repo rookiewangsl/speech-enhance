@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sample_rate": 16000,
+  "model_id": "openai/whisper-small",
+  "revision": "973afd24965f72e36ca33b3055d56a652f456b4d",
+  "model_safetensors_sha256": "1d7734884874f1a1513ed9aa760a4f8e97aaa02fd6d93a3a85d27b2ae9ca596b",
+  "model_family": "multilingual",
+  "language": "zh",
+  "task": "transcribe",
+  "return_timestamps": false,
+  "temperature": 0.0,
+  "do_sample": false,
+  "num_beams": 1,
+  "condition_on_prev_tokens": false,
+  "main_metric": "normalized_cer"
+}

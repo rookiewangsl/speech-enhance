@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "sample_rate": 16000,
+  "corpus": "AISHELL-1",
+  "source": "OpenSLR-33",
+  "seed": 2026,
+  "train_subset_hours": 20,
+  "fallback_train_subset_hours": 10,
+  "minimum_duration_seconds": 0.5,
+  "maximum_clean_duration_seconds": 25.0,
+  "maximum_clipped_fraction": 0.01,
+  "dev_model_utterances": 1000,
+  "dev_frontend_utterances": 500,
+  "test_reverb_utterances": 1000,
+  "measured_rir_test_utterances": 500,
+  "mct_clean_probability": 0.5,
+  "mct_raw_reverb_probability": 0.5
+}

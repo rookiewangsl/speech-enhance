@@ -33,6 +33,18 @@ asr = [
     "openai-whisper==20250625",
     "torch==2.13.0",
 ]
+robust-asr = [
+    "nara-wpe>=0.0.0",
+    "opencc-python-reimplemented>=0.1.7",
+    "pyroomacoustics>=0.8",
+    "torch==2.13.0",
+    "transformers>=4.46,<6",
+]
+robust-asr-train = [
+    "accelerate>=1.0",
+    "datasets>=3.0",
+    "peft>=0.13",
+]
 dev = [
     "pytest>=8.0",
 ]

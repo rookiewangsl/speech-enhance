@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "sample_rate": 16000,
+  "models": ["w0_pretrained", "w1_clean_lora", "w2_mct_lora"],
+  "frontends": ["raw", "s_wpe_10", "s_wpe_40", "m_wpe_10"],
+  "rt60_seconds": [0.2, 0.4, 0.6, 0.8, 1.0],
+  "test_reverb_utterances": 1000,
+  "bootstrap_draws": 10000,
+  "bootstrap_seed": 2026,
+  "normalization": {
+    "unicode": "NFKC",
+    "traditional_to_simplified": true,
+    "casefold_latin": true,
+    "remove_whitespace": true,
+    "remove_punctuation_and_symbols": true,
+    "normalize_arabic_numbers_to_chinese": false
+  },
+  "primary_metric": "normalized_corpus_cer",
+  "diagnostics": [
+    "strict_cer",
+    "substitutions",
+    "deletions",
+    "insertions",
+    "rt60",
+    "drr",
+    "distance",
+    "speaker"
+  ]
+}
