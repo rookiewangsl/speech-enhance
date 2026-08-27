@@ -123,7 +123,11 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         },
         context="whisper",
     )
-    require_keys(lora, {"rank", "pilot_targets", "formal_runs"}, context="lora")
+    require_keys(
+        lora,
+        {"rank", "task_type", "peft_wrapper", "pilot_targets", "formal_runs"},
+        context="lora",
+    )
     require_keys(
         evaluation,
         {"models", "frontends", "test_reverb_utterances", "rt60_seconds"},
@@ -153,6 +157,10 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         raise ValueError("Whisper must use zh transcription")
     if lora["rank"] != 8:
         raise ValueError("v0.1 fixes LoRA rank=8")
+    if lora["task_type"] is not None:
+        raise ValueError("Whisper LoRA must not use the text Seq2Seq PEFT wrapper")
+    if lora["peft_wrapper"] != "generic_for_whisper_input_features":
+        raise ValueError("Whisper LoRA must preserve input_features")
     train_hours = _positive_int(data["train_subset_hours"], name="train_subset_hours")
     fallback_hours = _positive_int(
         data["fallback_train_subset_hours"],

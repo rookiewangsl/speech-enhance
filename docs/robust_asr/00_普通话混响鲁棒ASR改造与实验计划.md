@@ -469,8 +469,14 @@ r: 8
 lora_alpha: 16
 lora_dropout: 0.05
 bias: none
-task_type: SEQ_2_SEQ_LM
+peft_wrapper: generic_for_whisper_input_features
+task_type: null
 ```
+
+Whisper 是语音条件生成模型，encoder 接收 `input_features` 而非文本 `input_ids`。因此不使用
+PEFT 的文本 `PeftModelForSeq2SeqLM` 包装器，而使用通用透传包装器；LoRA 目标层、rank、alpha、
+dropout、adapter 保存格式和可训练参数语义不变。正式训练前必须使用真实 `input_features` 和 labels
+完成一次 FP16 forward/backward 验收，不能只检查 adapter 数量和参数冻结。
 
 不做 rank 大网格、DoRA、QLoRA、all-linear、全参数微调或额外语言模型。`r=16` 只在训练损失和
 dev CER 均显示欠拟合时作为条件触发的诊断。

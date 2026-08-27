@@ -28,6 +28,34 @@ class WhisperLoRAComponents:
     total_parameters: int
 
 
+def _build_whisper_lora_config(
+    *,
+    settings: LoRAProtocol,
+    target_modules: tuple[str, ...],
+):
+    """Build a generic PEFT config that preserves Whisper ``input_features``.
+
+    ``PeftModelForSeq2SeqLM`` assumes a text encoder and injects ``input_ids``
+    into the wrapped model. Whisper is a speech conditional-generation model;
+    its encoder input is ``input_features``. Leaving ``task_type`` unset makes
+    PEFT use its generic transparent wrapper while retaining the same LoRA
+    adapters, save/load format, and trainable-parameter semantics.
+    """
+
+    try:
+        from peft import LoraConfig
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError("Whisper LoRA training requires peft") from exc
+    return LoraConfig(
+        r=settings.rank,
+        lora_alpha=settings.alpha,
+        lora_dropout=settings.dropout,
+        bias=settings.bias,
+        task_type=None,
+        target_modules=list(target_modules),
+    )
+
+
 def load_whisper_lora_components(
     *,
     model_id: str = "openai/whisper-small",
@@ -40,7 +68,7 @@ def load_whisper_lora_components(
     """Load Whisper, validate exact target names, and attach LoRA adapters."""
 
     try:
-        from peft import LoraConfig, TaskType, get_peft_model
+        from peft import get_peft_model
         from transformers import WhisperForConditionalGeneration, WhisperProcessor
     except ImportError as exc:  # pragma: no cover - installed after storage arrives
         raise RuntimeError(
@@ -67,13 +95,9 @@ def load_whisper_lora_components(
         encoder_layers=encoder_layers,
         decoder_layers=decoder_layers,
     )
-    peft_config = LoraConfig(
-        r=settings.rank,
-        lora_alpha=settings.alpha,
-        lora_dropout=settings.dropout,
-        bias=settings.bias,
-        task_type=TaskType.SEQ_2_SEQ_LM,
-        target_modules=list(targets),
+    peft_config = _build_whisper_lora_config(
+        settings=settings,
+        target_modules=targets,
     )
     model = get_peft_model(model, peft_config)
     trainable = sum(
