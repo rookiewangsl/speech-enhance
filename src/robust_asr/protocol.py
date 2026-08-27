@@ -125,7 +125,14 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
     )
     require_keys(
         lora,
-        {"rank", "task_type", "peft_wrapper", "pilot_targets", "formal_runs"},
+        {
+            "rank",
+            "task_type",
+            "peft_wrapper",
+            "pilot_targets",
+            "formal_runs",
+            "logging",
+        },
         context="lora",
     )
     require_keys(
@@ -180,6 +187,29 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         "effective_batch_size"
     ]:
         raise ValueError("LoRA effective batch size is inconsistent")
+    logging = lora["logging"]
+    if not isinstance(logging, Mapping):
+        raise ValueError("LoRA logging config must be an object")
+    require_keys(
+        logging,
+        {
+            "console_interval_steps",
+            "structured_interval_steps",
+            "selection_metric",
+            "heavy_rt60_seconds",
+        },
+        context="lora.logging",
+    )
+    console_interval = _positive_int(
+        logging["console_interval_steps"], name="console_interval_steps"
+    )
+    structured_interval = _positive_int(
+        logging["structured_interval_steps"], name="structured_interval_steps"
+    )
+    if structured_interval > console_interval:
+        raise ValueError("structured logs cannot be less frequent than console output")
+    if logging["selection_metric"] != "dev_reverb_cer":
+        raise ValueError("checkpoint selection metric must be dev_reverb_cer")
     expected_wpe_taps = {"s_wpe_10": 10, "s_wpe_40": 40, "m_wpe_10": 10}
     if wpe.get("taps") != expected_wpe_taps:
         raise ValueError("WPE tap conditions disagree with the frozen protocol")
@@ -191,6 +221,9 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
     rt60 = tuple(float(value) for value in evaluation["rt60_seconds"])
     if tuple(float(value) for value in rir["test_rt60_seconds"]) != rt60:
         raise ValueError("RIR and evaluation RT60 grids disagree")
+    heavy_rt60 = tuple(float(value) for value in logging["heavy_rt60_seconds"])
+    if not heavy_rt60 or any(value not in rt60 for value in heavy_rt60):
+        raise ValueError("heavy RT60 values must be a non-empty evaluation subset")
     if tuple(wpe["conditions"]) != tuple(value.value for value in frontends):
         raise ValueError("WPE and evaluation frontend order disagree")
     if set(models) != set(ModelCondition):

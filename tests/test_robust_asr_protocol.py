@@ -35,3 +35,14 @@ def test_protocol_rejects_cross_file_rt60_mismatch(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="RT60 grids disagree"):
         load_and_validate_protocol(tmp_path)
 
+
+def test_protocol_rejects_heavy_rt60_outside_evaluation_grid(tmp_path: Path) -> None:
+    for filename in CONFIG_FILES:
+        shutil.copy2(CONFIG_ROOT / filename, tmp_path / filename)
+    lora_path = tmp_path / "lora.json"
+    lora = json.loads(lora_path.read_text(encoding="utf-8"))
+    lora["logging"]["heavy_rt60_seconds"] = [1.2]
+    lora_path.write_text(json.dumps(lora), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="heavy RT60"):
+        load_and_validate_protocol(tmp_path)

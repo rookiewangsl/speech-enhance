@@ -28,6 +28,7 @@ src/robust_asr/
   acoustics/                    阵列几何、RIR 仿真、DRR 与卷积
   dereverb/                     单/多通道 WPE 前端
   models/                       Whisper 推理与 LoRA 配置
+  training/                     精简终端进度与结构化训练日志
   aishell.py                    AISHELL 数据发现和划分
   baseline.py                   基线实验编排
   manifest.py                   JSONL manifest 与哈希

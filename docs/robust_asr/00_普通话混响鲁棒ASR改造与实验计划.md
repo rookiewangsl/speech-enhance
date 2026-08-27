@@ -526,6 +526,11 @@ max_epochs: 3
 gradient_checkpointing: true
 max_grad_norm: 1.0
 seed: 2026
+logging:
+  console_interval_steps: 20
+  structured_interval_steps: 10
+  selection_metric: dev_reverb_cer
+  heavy_rt60_seconds: [0.8, 1.0]
 ```
 
 batch 2 OOM 时改成 batch 1、accumulation 16，保持有效 batch 不变。按音频长度分桶并动态
@@ -536,9 +541,34 @@ padding。正式训练前运行 100 optimizer steps，记录 step time、峰值�
 3. 仍超过 8 h：L1/L2 同时统一降成 10 h；
 4. 不能只缩短某一模型。
 
-每 250 optimizer steps 记录 train/dev loss，每个 epoch 结束解码 `dev_model` 并计算 CER。
-选择 dev robust CER 最低且 clean 退化可接受的 checkpoint，只保存 adapter、训练状态、配置、
-依赖版本、base model revision 和 SHA。
+训练循环每 10 optimizer steps写入一次结构化指标，终端每 20 步动态刷新一次。每个 epoch 结束解码
+`dev_model` 并计算 CER。选择 `dev_reverb_cer` 最低且 clean 退化可接受的 checkpoint，只保存
+adapter、训练状态、配置、依赖版本、base model revision 和 SHA。
+
+### 10.6 终端与日志职责
+
+终端只服务于训练监控和超参数调整：启动时显示模型、LoRA、数据规模、有效 batch、学习率与 GPU；
+训练中显示 epoch/step、即时与 EMA loss、学习率、梯度范数、速度、显存和 ETA；每个 epoch 结束只显示
+clean CER、总体 reverb CER、重混响 CER、当前最佳值和 checkpoint 状态。只有 NaN、梯度异常、显存
+或数据吞吐问题才额外打印 warning。
+
+完整信息写入 run 目录，不在终端展开：
+
+```text
+runs/<experiment_id>/
+  run_config.json          冻结协议和全部超参数
+  environment.json         Git、Python、CUDA 和依赖版本
+  data_audit.json          manifest/RIR 哈希和泄漏检查
+  train_metrics.jsonl      每 10 step 的训练指标
+  eval_metrics.jsonl       每个 epoch 的完整 CER、S/D/I 和分层结果
+  eval_by_rt60.json        各 epoch 的五档 RT60 CER
+  predictions.jsonl        逐条参考、识别结果和条件
+  warnings.jsonl           NaN、OOM、异常音频和性能告警
+  training_summary.json    最佳 epoch、耗时、峰值显存和 checkpoint
+```
+
+`src/robust_asr/training/reporting.py` 是训练循环的统一输出接口。结构化日志支持同一配置续跑；若
+run 目录中的配置、环境或数据审计与本次启动不一致，则拒绝覆盖，避免把两个实验混在一起。
 
 ## 11. 实验和消融矩阵
 
@@ -676,7 +706,7 @@ source-array distance、房间体积、声源高度和方位角作为几何协�
 
 ### 12.4 解码异常
 
-沿用原项目的异常分析思想，记录：
+解码异常诊断记录：
 
 - hypothesis 字符数和字符速率；
 - 重复 n-gram；
@@ -836,8 +866,7 @@ WPE 消融 > 实测 RIR > Paraformer。不得为了外部扩展牺牲核心 test
 边界：仿真结论能否迁移到未见实测 RIR，哪些问题尚未覆盖？
 ```
 
-在新结果完成前，不提前写具体 CER 改善数字。原英文项目结果后续迁到 `docs/legacy/`，新 README
-再以本项目为主；迁移时保留原代码、测试和历史证据，不删除已有成果。
+在新结果完成前，不提前写具体 CER 改善数字。历史英文项目只通过 Git 历史审计，不重新并入活动代码树。
 
 ## 19. 参考实现与资料
 
