@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Literal, Protocol
 
 import numpy as np
 import soundfile as sf
+from scipy.stats import spearmanr
 
 from .acoustics.rir import convolve_multichannel
 from .config import canonical_sha256
@@ -34,6 +36,22 @@ class Transcriber(Protocol):
     device: str
 
     def transcribe(self, audio: np.ndarray, *, sample_rate: int = 16_000) -> str: ...
+
+
+@dataclass(frozen=True)
+class BaselineProgress:
+    """Small progress event for a resumable baseline run."""
+
+    stage: Literal["start", "progress", "complete"]
+    completed: int
+    total: int
+    resumed: int
+    generated: int
+    elapsed_seconds: float
+    utterance_id: str | None = None
+    frontend: str | None = None
+    rt60_seconds: float | None = None
+    inference_seconds: float | None = None
 
 
 def _stable_rank(seed: int, value: str) -> bytes:
@@ -200,6 +218,110 @@ def _paired_deltas(
     return comparisons
 
 
+def _first_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        if not value:
+            return None
+        value = value[0]
+    number = float(value)
+    return number if math.isfinite(number) else None
+
+
+def _spearman_summary(
+    rows: Sequence[Mapping[str, Any]], *, field: str
+) -> dict[str, float | int | None]:
+    pairs = [
+        (_first_float(row.get(field)), float(row["cer"]))
+        for row in rows
+    ]
+    valid = [
+        (x, y)
+        for x, y in pairs
+        if x is not None and math.isfinite(y)
+    ]
+    if len(valid) < 3:
+        return {"utterances": len(valid), "spearman_rho": None, "pvalue": None}
+    x = np.asarray([pair[0] for pair in valid], dtype=np.float64)
+    y = np.asarray([pair[1] for pair in valid], dtype=np.float64)
+    if np.ptp(x) == 0 or np.ptp(y) == 0:
+        return {"utterances": len(valid), "spearman_rho": None, "pvalue": None}
+    result = spearmanr(x, y)
+    rho = float(result.statistic)
+    pvalue = float(result.pvalue)
+    return {
+        "utterances": len(valid),
+        "spearman_rho": rho if math.isfinite(rho) else None,
+        "pvalue": pvalue if math.isfinite(pvalue) else None,
+    }
+
+
+def _raw_robustness_analysis(
+    results: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    raw = [
+        row
+        for row in results
+        if row.get("frontend") == "raw"
+        and row.get("target_rt60_seconds") is not None
+    ]
+    by_rt60: dict[str, Any] = {}
+    for rt60 in sorted({float(row["target_rt60_seconds"]) for row in raw}):
+        group = [
+            row for row in raw if float(row["target_rt60_seconds"]) == rt60
+        ]
+        drr_values = [
+            value
+            for row in group
+            if (value := _first_float(row.get("reference_drr_db", row.get("drr_db"))))
+            is not None
+        ]
+        by_rt60[f"{rt60:.1f}"] = {
+            "utterances": len(group),
+            "mean_reference_drr_db": float(np.mean(drr_values))
+            if drr_values
+            else None,
+            "drr_cer_spearman": _spearman_summary(
+                [
+                    {
+                        **row,
+                        "analysis_drr_db": row.get(
+                            "reference_drr_db", row.get("drr_db")
+                        ),
+                    }
+                    for row in group
+                ],
+                field="analysis_drr_db",
+            ),
+        }
+    enriched = [
+        {
+            **row,
+            "analysis_target_rt60": row.get("target_rt60_seconds"),
+            "analysis_measured_rt60": row.get(
+                "reference_measured_rt60_seconds",
+                row.get("measured_rt60_seconds"),
+            ),
+            "analysis_drr_db": row.get("reference_drr_db", row.get("drr_db")),
+        }
+        for row in raw
+    ]
+    return {
+        "utterances": len(raw),
+        "target_rt60_cer_spearman": _spearman_summary(
+            enriched, field="analysis_target_rt60"
+        ),
+        "measured_rt60_cer_spearman": _spearman_summary(
+            enriched, field="analysis_measured_rt60"
+        ),
+        "drr_cer_spearman_uncontrolled": _spearman_summary(
+            enriched, field="analysis_drr_db"
+        ),
+        "by_target_rt60": by_rt60,
+    }
+
+
 def run_frozen_baseline(
     *,
     manifest_path: str | Path,
@@ -219,9 +341,15 @@ def run_frozen_baseline(
     seed: int = 2026,
     normalizer: ChineseTextNormalizer | None = None,
     bootstrap_draws: int = 10_000,
+    checkpoint_every_results: int = 20,
+    progress_callback: Callable[[BaselineProgress], None] | None = None,
 ) -> dict[str, Any]:
     """Run clean plus factorial reverb/frontend inference with atomic resume."""
 
+    if checkpoint_every_results <= 0:
+        raise ValueError("checkpoint_every_results must be positive")
+    if not frontends or len(set(frontends)) != len(frontends):
+        raise ValueError("frontends must be non-empty and unique")
     manifest_rows = read_jsonl(manifest_path)
     selected = select_speaker_balanced_count(manifest_rows, limit=limit, seed=seed)
     rir_rows = read_jsonl(rir_manifest_path)
@@ -229,12 +357,11 @@ def run_frozen_baseline(
     existing = read_jsonl(destination) if destination.is_file() else []
     run_identity = canonical_sha256(
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "model_id": transcriber.model_id,
             "model_revision": getattr(transcriber, "model_revision", None),
             "utterances": selected,
             "rir_manifest": rir_rows,
-            "frontends": list(frontends),
             "wpe_backend": "nara_wpe",
             "wpe_config": asdict(WPEConfig()),
             "level_protocol": {
@@ -260,6 +387,51 @@ def run_frozen_baseline(
     corpus = Path(corpus_root)
     rir_directory = Path(rir_root)
     validated_rir_paths: set[Path] = set()
+    required_keys = {
+        (str(row["utterance_id"]), "clean", "clean") for row in selected
+    }
+    required_keys.update(
+        (
+            str(row["utterance_id"]),
+            str(frontend),
+            f"{float(rt60):.6f}",
+        )
+        for row in selected
+        for rt60 in rt60_seconds
+        for frontend in frontends
+    )
+    resumed = len(required_keys.intersection(result_by_key))
+    total = len(required_keys)
+    completed = resumed
+    generated = 0
+    started_run = time.perf_counter()
+
+    def notify(
+        stage: Literal["start", "progress", "complete"],
+        *,
+        row: Mapping[str, Any] | None = None,
+        frontend: str | None = None,
+        rt60: float | None = None,
+        inference_seconds: float | None = None,
+    ) -> None:
+        if progress_callback is None:
+            return
+        progress_callback(
+            BaselineProgress(
+                stage=stage,
+                completed=completed,
+                total=total,
+                resumed=resumed,
+                generated=generated,
+                elapsed_seconds=time.perf_counter() - started_run,
+                utterance_id=None if row is None else str(row["utterance_id"]),
+                frontend=frontend,
+                rt60_seconds=rt60,
+                inference_seconds=inference_seconds,
+            )
+        )
+
+    notify("start")
 
     def result_key(
         row: Mapping[str, Any], frontend: str, rt60: float | None
@@ -301,6 +473,7 @@ def run_frozen_baseline(
         rt60: float | None,
         rir: Mapping[str, Any] | None,
     ) -> None:
+        nonlocal completed, generated
         key = result_key(row, frontend, rt60)
         if key in result_by_key:
             return
@@ -329,7 +502,13 @@ def run_frozen_baseline(
             "measured_rt60_seconds": None
             if rir is None
             else rir["measured_rt60_seconds"],
+            "reference_measured_rt60_seconds": None
+            if rir is None
+            else _first_float(rir["measured_rt60_seconds"]),
             "drr_db": None if rir is None else rir["drr_db"],
+            "reference_drr_db": None
+            if rir is None
+            else _first_float(rir["drr_db"]),
             "reference_raw": row.get("transcript_raw", row["transcript"]),
             "reference": reference,
             "hypothesis_raw": hypothesis_raw,
@@ -342,7 +521,17 @@ def run_frozen_baseline(
             **score.as_dict(),
         }
         result_by_key[key] = result
-        write_jsonl_atomic(destination, result_by_key.values())
+        completed += 1
+        generated += 1
+        if generated % checkpoint_every_results == 0:
+            write_jsonl_atomic(destination, result_by_key.values())
+        notify(
+            "progress",
+            row=row,
+            frontend=frontend,
+            rt60=rt60,
+            inference_seconds=elapsed,
+        )
 
     for row in selected:
         clean = _read_clean(corpus, row)
@@ -381,7 +570,10 @@ def run_frozen_baseline(
                     rir=rir,
                 )
 
-    results = list(result_by_key.values())
+    write_jsonl_atomic(destination, result_by_key.values())
+    requested_results = [
+        row for key, row in result_by_key.items() if key in required_keys
+    ]
     summary = {
         "schema_version": 1,
         "model_id": transcriber.model_id,
@@ -391,15 +583,18 @@ def run_frozen_baseline(
         "utterance_limit": limit,
         "frontends": list(frontends),
         "rt60_seconds": list(map(float, rt60_seconds)),
-        "result_rows": len(results),
-        "conditions": _summarize(results),
+        "result_rows": len(requested_results),
+        "resumed_rows": resumed,
+        "generated_rows": generated,
+        "conditions": _summarize(requested_results),
         "paired_deltas": _paired_deltas(
-            results,
+            requested_results,
             rt60_seconds=rt60_seconds,
             frontends=frontends,
             draws=bootstrap_draws,
             seed=seed,
         ),
+        "raw_robustness": _raw_robustness_analysis(requested_results),
     }
     summary_path = destination.with_suffix(".summary.json")
     temporary = summary_path.with_suffix(".json.tmp")
@@ -408,4 +603,5 @@ def run_frozen_baseline(
         encoding="utf-8",
     )
     os.replace(temporary, summary_path)
+    notify("complete")
     return summary

@@ -7,7 +7,11 @@ import numpy as np
 import soundfile as sf
 import pytest
 
-from robust_asr.baseline import run_frozen_baseline, select_speaker_balanced_count
+from robust_asr.baseline import (
+    BaselineProgress,
+    run_frozen_baseline,
+    select_speaker_balanced_count,
+)
 from robust_asr.dereverb.frontend import apply_frontend
 from robust_asr.download import sha256_file
 from robust_asr.manifest import write_jsonl_atomic
@@ -18,9 +22,13 @@ class EchoTranscriber:
     model_id = "test/echo"
     device = "cpu"
 
+    def __init__(self) -> None:
+        self.calls = 0
+
     def transcribe(self, audio: np.ndarray, *, sample_rate: int = 16_000) -> str:
         assert sample_rate == 16_000
         assert audio.ndim == 1
+        self.calls += 1
         return "测 试"
 
 
@@ -48,7 +56,9 @@ def test_nara_frontends_preserve_mono_length() -> None:
     assert np.isfinite(multi).all()
 
 
-def test_end_to_end_baseline_with_fake_transcriber(tmp_path: Path) -> None:
+def test_end_to_end_baseline_resumes_when_frontends_are_extended(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     corpus = tmp_path / "corpus"
     wav = corpus / "data_aishell/wav/test/S0001/BAC009S0001W0001.wav"
     wav.parent.mkdir(parents=True)
@@ -90,19 +100,57 @@ def test_end_to_end_baseline_with_fake_transcriber(tmp_path: Path) -> None:
         ],
     )
     output = tmp_path / "results.jsonl"
+    transcriber = EchoTranscriber()
+    monkeypatch.setattr(
+        "robust_asr.baseline.apply_frontend",
+        lambda audio, frontend, backend: np.asarray(audio[0]),
+    )
+    events: list[BaselineProgress] = []
     summary = run_frozen_baseline(
         manifest_path=manifest,
         corpus_root=corpus,
         rir_manifest_path=rir_manifest,
         rir_root=rir_root,
         output_path=output,
-        transcriber=EchoTranscriber(),
+        transcriber=transcriber,
         limit=1,
         frontends=("raw",),
         rt60_seconds=(0.2,),
         normalizer=ChineseTextNormalizer(traditional_to_simplified=False),
+        checkpoint_every_results=2,
+        progress_callback=events.append,
     )
     assert summary["result_rows"] == 2
+    assert summary["generated_rows"] == 2
+    assert summary["raw_robustness"]["utterances"] == 1
     assert all(row["cer"] == 0 for row in summary["conditions"])
+    assert transcriber.calls == 2
+    assert [event.stage for event in events] == [
+        "start",
+        "progress",
+        "progress",
+        "complete",
+    ]
+
+    extended = run_frozen_baseline(
+        manifest_path=manifest,
+        corpus_root=corpus,
+        rir_manifest_path=rir_manifest,
+        rir_root=rir_root,
+        output_path=output,
+        transcriber=transcriber,
+        limit=1,
+        frontends=("raw", "s_wpe_10"),
+        rt60_seconds=(0.2,),
+        normalizer=ChineseTextNormalizer(traditional_to_simplified=False),
+    )
+    assert extended["result_rows"] == 3
+    assert extended["resumed_rows"] == 2
+    assert extended["generated_rows"] == 1
+    assert transcriber.calls == 3
     stored = [json.loads(line) for line in output.read_text().splitlines()]
-    assert {row["frontend"] for row in stored} == {"clean", "raw"}
+    assert {row["frontend"] for row in stored} == {
+        "clean",
+        "raw",
+        "s_wpe_10",
+    }
