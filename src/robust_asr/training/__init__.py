@@ -1,4 +1,9 @@
-"""Training orchestration utilities."""
+"""Training data, reporting, and orchestration utilities."""
+
+from robust_asr.training.data import (
+    WhisperAdaptationDataset,
+    WhisperBatchCollator,
+)
 
 from robust_asr.training.reporting import (
     ConsoleTrainingReporter,
@@ -18,4 +23,6 @@ __all__ = [
     "TrainingCompletion",
     "TrainingProgress",
     "TrainingReporter",
+    "WhisperAdaptationDataset",
+    "WhisperBatchCollator",
 ]

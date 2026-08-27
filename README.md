@@ -19,6 +19,7 @@
 - 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
 - 已完成协议校验、数据泄漏检查和自动测试。
 - 已完成 500 条开发集 Clean+Raw 五档 RT60 基线；Raw CER 从 13.56% 单调上升至 27.36%。
+- 已实现 Clean/MCT 训练 Dataset、epoch 级确定性 RIR 采样和 Whisper batch collator。
 - 正式 WPE 开发集消融正在运行；尚未执行 LoRA 训练和封存 test 评测。
 
 ## 仓库结构
@@ -29,7 +30,7 @@ src/robust_asr/
   acoustics/                    阵列几何、RIR 仿真、DRR 与卷积
   dereverb/                     单/多通道 WPE 前端
   models/                       Whisper 推理与 LoRA 配置
-  training/                     精简终端进度与结构化训练日志
+  training/                     训练数据、批处理、终端进度与结构化日志
   aishell.py                    AISHELL 数据发现和划分
   baseline.py                   基线实验编排
   manifest.py                   JSONL manifest 与哈希

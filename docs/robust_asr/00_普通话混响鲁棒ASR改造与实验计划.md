@@ -1,8 +1,9 @@
 # 普通话混响鲁棒 ASR：项目改造与实验计划
 
 最后更新：2026-08-28
-状态：方案 v0.3；AISHELL-1、开发集 RIR、Linux GPU 环境和 LoRA 反向链路已经验收。正式冻结
-基线、WPE 消融、训练管线、LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的 smoke 结果外，
+状态：方案 v0.3；AISHELL-1、开发集 RIR、Linux GPU 环境、LoRA 反向链路和正式 Raw 开发集
+基线已经验收，WPE 开发集消融正在运行。训练 Dataset/Collator 已实现；train/test RIR、优化循环、
+LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
 
@@ -25,6 +26,8 @@
   500 条 test-measured-RIR 子集；
 - 固定 revision 的 `openai/whisper-small` CPU 开发集烟雾运行，覆盖 clean、三档 RT60 与四路前端；
 - Linux RTX 4070 上的本地权重加载、真实语音 GPU 推理与 LoRA forward/backward 验收；
+- 500 条开发集上的 Clean+Raw 五档 RT60 正式基线、成对置信区间与条件化 DRR 分析；
+- Clean/MCT 训练 Dataset、epoch 级确定性 train RIR 采样、文件校验与 Whisper batch collator；
 - 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
@@ -38,8 +41,8 @@
 ./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：冻结 Whisper 开发集基线、全量 NARA-WPE 处理、train/test RIR bank、正式训练管线、
-LoRA 训练和 test 推理。Linux + RTX 4070 环境统一安装 `.[asr,train,evaluation,dev]`。
+仍待执行：完成全量 NARA-WPE 开发集消融、train/test RIR bank、优化循环与 checkpoint/dev 选择、
+训练 CLI、LoRA 训练和 test 推理。Linux + RTX 4070 环境统一安装 `.[asr,train,evaluation,dev]`。
 
 ## 1. 项目定位
 
@@ -206,6 +209,7 @@ src/robust_asr/
   acoustics/            RIR 生成、RT60/DRR、卷积和幅值协议
   dereverb/             NARA-WPE 封装和固定前端
   models/               Whisper 冻结推理和 LoRA 注入
+  training/             Clean/MCT 数据、Whisper 批处理与训练日志
   aishell.py             AISHELL 审计和确定性切分
   manifest.py            JSONL manifest 与哈希
   scoring.py             CER、S/D/I、bootstrap 和条件汇总
@@ -232,8 +236,8 @@ tests/
 docs/robust_asr/
 ```
 
-训练 Dataset/Collator、优化循环、checkpoint 选择、训练 CLI 和正式结果绘图尚未实现；它们是下一阶段
-新增项，不应在现状清单中伪装成已有文件。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
+优化循环、checkpoint 选择、训练 CLI 和正式结果绘图尚未实现；它们是下一阶段新增项，不应在现状
+清单中伪装成已有文件。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
 
 新代码只进入 `robust_asr` 命名空间，不恢复旧项目模块。
 
@@ -533,8 +537,10 @@ logging:
   heavy_rt60_seconds: [0.8, 1.0]
 ```
 
-batch 2 OOM 时改成 batch 1、accumulation 16，保持有效 batch 不变。按音频长度分桶并动态
-padding。正式训练前运行 100 optimizer steps，记录 step time、峰值显存、音频吞吐和预计总时长：
+batch 2 OOM 时改成 batch 1、accumulation 16，保持有效 batch 不变。当前 Whisper encoder 要求固定
+3000 帧 log-Mel 输入，因此批处理明确补齐到 30 秒，并在进入特征提取前拒绝超长样本，不宣称采用
+动态特征 padding 降低计算量。正式训练前运行 100 optimizer steps，记录 step time、峰值显存、
+音频吞吐和预计总时长：
 
 1. 单次预计 `<=8 h`：20 h、最多 3 epoch；
 2. 超过 8 h：先统一改成最多 2 epoch；

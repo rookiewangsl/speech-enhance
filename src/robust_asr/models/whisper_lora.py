@@ -82,9 +82,16 @@ def load_whisper_lora_components(
         "cache_dir": str(cache_dir) if cache_dir is not None else None,
     }
     processor = WhisperProcessor.from_pretrained(model_id, **load_kwargs)
+    processor.tokenizer.set_prefix_tokens(
+        language="zh",
+        task="transcribe",
+        predict_timestamps=False,
+    )
     model = WhisperForConditionalGeneration.from_pretrained(
         model_id, **load_kwargs
     )
+    model.generation_config.language = "zh"
+    model.generation_config.task = "transcribe"
     names = tuple(name for name, _ in model.named_modules())
     targets = select_lora_target_names(names, target)
     encoder_layers = len(model.model.encoder.layers)
