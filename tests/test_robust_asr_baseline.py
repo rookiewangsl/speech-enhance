@@ -123,6 +123,12 @@ def test_end_to_end_baseline_resumes_when_frontends_are_extended(
     assert summary["result_rows"] == 2
     assert summary["generated_rows"] == 2
     assert summary["raw_robustness"]["utterances"] == 1
+    assert summary["raw_robustness"]["by_target_rt60"]["0.2"]["unique_rirs"] == 1
+    assert (
+        summary["raw_robustness"]["by_target_rt60"]["0.2"]
+        ["drr_cer_degradation_spearman"]["spearman_rho"]
+        is None
+    )
     assert all(row["cer"] == 0 for row in summary["conditions"])
     assert transcriber.calls == 2
     assert [event.stage for event in events] == [

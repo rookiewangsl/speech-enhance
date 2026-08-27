@@ -230,10 +230,10 @@ def _first_float(value: Any) -> float | None:
 
 
 def _spearman_summary(
-    rows: Sequence[Mapping[str, Any]], *, field: str
+    rows: Sequence[Mapping[str, Any]], *, field: str, outcome: str = "cer"
 ) -> dict[str, float | int | None]:
     pairs = [
-        (_first_float(row.get(field)), float(row["cer"]))
+        (_first_float(row.get(field)), float(row[outcome]))
         for row in rows
     ]
     valid = [
@@ -260,11 +260,21 @@ def _spearman_summary(
 def _raw_robustness_analysis(
     results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    clean_cer = {
+        str(row["utterance_id"]): float(row["cer"])
+        for row in results
+        if row.get("frontend") == "clean"
+    }
     raw = [
-        row
+        {
+            **row,
+            "cer_degradation_from_clean": float(row["cer"])
+            - clean_cer[str(row["utterance_id"])],
+        }
         for row in results
         if row.get("frontend") == "raw"
         and row.get("target_rt60_seconds") is not None
+        and str(row["utterance_id"]) in clean_cer
     ]
     by_rt60: dict[str, Any] = {}
     for rt60 in sorted({float(row["target_rt60_seconds"]) for row in raw}):
@@ -277,22 +287,51 @@ def _raw_robustness_analysis(
             if (value := _first_float(row.get("reference_drr_db", row.get("drr_db"))))
             is not None
         ]
+        enriched_group = [
+            {
+                **row,
+                "analysis_drr_db": row.get(
+                    "reference_drr_db", row.get("drr_db")
+                ),
+            }
+            for row in group
+        ]
+        rir_groups: dict[str, list[Mapping[str, Any]]] = {}
+        for row in enriched_group:
+            rir_groups.setdefault(str(row["rir_id"]), []).append(row)
+        by_rir = [
+            {
+                "analysis_drr_db": values[0]["analysis_drr_db"],
+                "mean_cer_degradation_from_clean": float(
+                    np.mean(
+                        [
+                            float(value["cer_degradation_from_clean"])
+                            for value in values
+                        ]
+                    )
+                ),
+            }
+            for values in rir_groups.values()
+        ]
         by_rt60[f"{rt60:.1f}"] = {
             "utterances": len(group),
+            "unique_rirs": len(rir_groups),
             "mean_reference_drr_db": float(np.mean(drr_values))
             if drr_values
             else None,
             "drr_cer_spearman": _spearman_summary(
-                [
-                    {
-                        **row,
-                        "analysis_drr_db": row.get(
-                            "reference_drr_db", row.get("drr_db")
-                        ),
-                    }
-                    for row in group
-                ],
+                enriched_group,
                 field="analysis_drr_db",
+            ),
+            "drr_cer_degradation_spearman": _spearman_summary(
+                enriched_group,
+                field="analysis_drr_db",
+                outcome="cer_degradation_from_clean",
+            ),
+            "drr_mean_degradation_by_rir_spearman": _spearman_summary(
+                by_rir,
+                field="analysis_drr_db",
+                outcome="mean_cer_degradation_from_clean",
             ),
         }
     enriched = [
@@ -312,8 +351,18 @@ def _raw_robustness_analysis(
         "target_rt60_cer_spearman": _spearman_summary(
             enriched, field="analysis_target_rt60"
         ),
+        "target_rt60_degradation_spearman": _spearman_summary(
+            enriched,
+            field="analysis_target_rt60",
+            outcome="cer_degradation_from_clean",
+        ),
         "measured_rt60_cer_spearman": _spearman_summary(
             enriched, field="analysis_measured_rt60"
+        ),
+        "measured_rt60_degradation_spearman": _spearman_summary(
+            enriched,
+            field="analysis_measured_rt60",
+            outcome="cer_degradation_from_clean",
         ),
         "drr_cer_spearman_uncontrolled": _spearman_summary(
             enriched, field="analysis_drr_db"
