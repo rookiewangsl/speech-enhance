@@ -3,9 +3,9 @@ requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "realtime-speech-enhancement"
+name = "mandarin-reverberation-robust-asr"
 version = "0.1.0"
-description = "Explainable streaming VAD and single-channel speech enhancement"
+description = "Controlled Mandarin reverberation-robust ASR experiments with WPE and Whisper LoRA"
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0",
@@ -14,36 +14,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-data = []
-evaluation = [
-    "matplotlib>=3.9",
-    "pystoi>=0.4",
-]
-perceptual = [
-    "onnxruntime==1.22.1",
-]
-external = [
-    "webrtcvad-wheels>=2.0.14",
-]
-demo = [
-    "matplotlib>=3.9",
-    "sounddevice>=0.5",
-]
 asr = [
-    "openai-whisper==20250625",
-    "torch==2.13.0",
-]
-robust-asr = [
     "nara-wpe>=0.0.0",
     "opencc-python-reimplemented>=0.1.7",
     "pyroomacoustics>=0.8",
     "torch==2.13.0",
     "transformers>=4.46,<6",
 ]
-robust-asr-train = [
+train = [
     "accelerate>=1.0",
     "datasets>=3.0",
     "peft>=0.13",
+]
+evaluation = [
+    "matplotlib>=3.9",
+    "pystoi>=0.4",
 ]
 dev = [
     "pytest>=8.0",
@@ -51,6 +36,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["robust_asr*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

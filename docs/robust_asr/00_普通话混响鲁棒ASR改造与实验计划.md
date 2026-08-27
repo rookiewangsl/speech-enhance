@@ -1,8 +1,8 @@
 # 普通话混响鲁棒 ASR：项目改造与实验计划
 
-最后更新：2026-08-26  
-状态：方案 v0.2；AISHELL-1 已下载、审计并完成开发集冻结 Whisper 烟雾基线。LoRA 训练与正式
-test 消融仍等待 Linux + RTX 4070。除[执行记录](01_执行记录与复现.md)明确列出的 smoke 结果外，
+最后更新：2026-08-28
+状态：方案 v0.3；AISHELL-1、开发集 RIR、Linux GPU 环境和 LoRA 反向链路已经验收。正式冻结
+基线、WPE 消融、训练管线、LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的 smoke 结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
 
@@ -17,14 +17,15 @@ test 消融仍等待 Linux + RTX 4070。除[执行记录](01_执行记录与复�
 - offline WPE 的 NumPy reference smoke 后端及 NARA-WPE 正式后端接口；
 - Whisper LoRA 精确目标层筛选、参数计数检查和 4070 训练预算回退逻辑；
 - 3 模型 × 4 前端 × 5 RT60 的 60-cell/60,000-input 正式矩阵生成；
-- 协议校验、矩阵导出和合成四通道 WPE smoke CLI；
+- 协议校验、矩阵导出和合成四通道 WPE 单元测试；
 - AISHELL-1 主包与资源包 SHA 校验、400 个 speaker 压缩包安全解包、141,925 WAV 全量审计；
 - 120,098 条训练、14,326 条开发、7,176 条测试可用清单；325 条无官方转写 WAV 均有审计记录且
   不进入训练或评测；
 - 可复现的 20 小时 train、1,000 条 dev-model、500 条 dev-frontend、1,000 条 test-reverb 和
   500 条 test-measured-RIR 子集；
 - 固定 revision 的 `openai/whisper-small` CPU 开发集烟雾运行，覆盖 clean、三档 RT60 与四路前端；
-- 新增稳健 ASR 测试通过；全仓库回归将在本轮收尾时重新执行。
+- Linux RTX 4070 上的本地权重加载、真实语音 GPU 推理与 LoRA forward/backward 验收；
+- 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
 要求 NARA-WPE。繁体转简体、Pyroomacoustics、Whisper/PEFT 也采用延迟导入，缺依赖时明确失败。
@@ -34,13 +35,11 @@ test 消融仍等待 Linux + RTX 4070。除[执行记录](01_执行记录与复�
 ```bash
 ./.venv/bin/python scripts/robust_asr/validate_protocol.py
 ./.venv/bin/python scripts/robust_asr/build_experiment_matrix.py --utterances 10
-./.venv/bin/python scripts/robust_asr/run_synthetic_wpe_smoke.py --seconds 0.4
-./.venv/bin/python -m pytest tests/test_robust_asr_*.py -q
+./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：完整 Pyroomacoustics RIR bank、全量 NARA-WPE 处理、LoRA 训练和 test 推理。建议继续
-使用独立 `.venv-robust-asr`，在 Linux + RTX 4070 上安装 `.[robust-asr,robust-asr-train,dev]`，不
-污染当前轻量 DSP 环境。
+仍待执行：冻结 Whisper 开发集基线、全量 NARA-WPE 处理、train/test RIR bank、正式训练管线、
+LoRA 训练和 test 推理。Linux + RTX 4070 环境统一安装 `.[asr,train,evaluation,dev]`。
 
 ## 1. 项目定位
 
@@ -66,14 +65,14 @@ test 消融仍等待 Linux + RTX 4070。除[执行记录](01_执行记录与复�
 
 ### 2.1 与原英文降噪项目
 
-原项目中的 MCRA、Wiener、RNNoise、VoiceBank+DEMAND 和 `small.en` 结果继续保留，作为历史
-英文单通道降噪项目，不进入新项目的核心实验矩阵。可复用的部分包括：
+原英文单通道降噪项目不再保留在活动代码树中，也不进入新项目实验矩阵。清理前代码和结果可从
+Git 提交 `767413b6df696f2b99aa5e5b1d52769834520b9e` 审计或恢复，但不应重新引入当前主线。
+新实现继承的只是以下工程方法：
 
-- 音频读写、采样率和有限值检查；
-- STFT/ISTFT 与幅值契约；
+- 音频读写、采样率、有限值和幅值检查；
 - manifest、审计和确定性抽样模式；
-- ASR 缓存、错误分解和 paired bootstrap；
-- 结果汇总、异常检测和 PNG 绘图基础设施。
+- 错误分解和 paired bootstrap；
+- 实验协议冻结、结果汇总和异常诊断思路。
 
 新项目不得继承以下假设：
 
@@ -200,27 +199,26 @@ P2 Encoder+Decoder-QV:
 
 ## 6. 仓库和产物组织
 
-计划新增：
+当前活动代码：
 
 ```text
 src/robust_asr/
-  data/                 AISHELL、manifest、文本规范化、采样器
   acoustics/            RIR 生成、RT60/DRR、卷积和幅值协议
-  dereverb/             NARA-WPE 封装和参考通道输出
-  models/               Whisper、LoRA、解码与 checkpoint
-  evaluation/           CER、S/D/I、bootstrap、条件汇总
+  dereverb/             NARA-WPE 封装和固定前端
+  models/               Whisper 冻结推理和 LoRA 注入
+  aishell.py             AISHELL 审计和确定性切分
+  manifest.py            JSONL manifest 与哈希
+  scoring.py             CER、S/D/I、bootstrap 和条件汇总
+  baseline.py            冻结基线编排
 
 scripts/robust_asr/
   download_aishell.py
+  extract_aishell.py
   prepare_aishell.py
   generate_rir_bank.py
-  audit_robust_asr_data.py
-  export_reverb_inputs.py
-  run_wpe.py
-  train_whisper_lora.py
-  evaluate_whisper.py
-  summarize_experiments.py
-  plot_results.py
+  build_experiment_matrix.py
+  validate_protocol.py
+  run_frozen_whisper_baseline.py
 
 configs/robust_asr/
   data.json
@@ -230,17 +228,19 @@ configs/robust_asr/
   lora.json
   evaluation.json
 
-data/manifests/robust_asr/
+tests/
 docs/robust_asr/
-docs/figures/robust_asr/*.png
 ```
 
-不要把新代码塞进 RNNoise/MCRA 模块；通用音频/STFT/评分逻辑可以复用或抽到兼容接口。
+训练 Dataset/Collator、优化循环、checkpoint 选择、训练 CLI 和正式结果绘图尚未实现；它们是下一阶段
+新增项，不应在现状清单中伪装成已有文件。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
+
+新代码只进入 `robust_asr` 命名空间，不恢复旧项目模块。
 
 大文件由任务专用变量指定，代码不得硬编码某块磁盘：
 
 ```bash
-export ROBUST_ASR_DATA_ROOT=/Volumes/T7/ProjectData/realtime_speech_enhancement/robust_asr
+export ROBUST_ASR_DATA_ROOT=/path/to/robust_asr
 ```
 
 Git 只保存代码、配置、可审计 manifest、小型 CSV/JSON 汇总和 PNG 图；AISHELL 压缩包、WAV、

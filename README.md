@@ -1,130 +1,77 @@
-# Real-time Speech Enhancement
+# Mandarin Reverberation-Robust ASR
 
-这是一个面向实时单通道语音前端的工程与实验项目。项目同时保留两类方法：
+本项目研究普通话远场混响条件下的 ASR 鲁棒性，核心问题是：
 
-- 可解释的 `MCRA + Decision-Directed Wiener`；
-- official pretrained RNNoise 的实时流式适配。
+> 可控混响如何影响 CER；传统单/多通道 WPE 与 Whisper 多条件 LoRA 适配是互补、
+> 冗余，还是会引入前端—模型失配？
 
-当前默认听感 Demo 使用 RNNoise R3，但项目结论不是“RNNoise 全场景最优”：它在低 SNR、
-非语音型噪声上抑制更强，在 high-SNR 和 babble 条件会过处理目标语音。固定 Whisper
-`small.en` 的未见说话人分层 ASR 结果进一步表明，感知降噪改善不等于 WER 改善。
+项目使用 AISHELL-1 干净普通话、Pyroomacoustics 四通道 RIR、NARA-WPE 和固定 revision
+的 `openai/whisper-small`。RT60 是主实验变量，DRR 用于解释同一 RT60 档内的识别差异，
+声源—阵列距离只作为几何协变量。
 
 ## 当前状态
 
-| 工作 | 状态 |
-|---|---|
-| VoiceBank+DEMAND 12,396 对音频的数据审计 | 完成 |
-| 8-speaker validation 3,224 对增强全量评测 | 完成 |
-| official test 824 对增强补充评测 | 完成；历史接触过，不称完全盲测 |
-| RNNoise 48/16 kHz persistent-state 流式适配 | 完成 |
-| 固定 Whisper v1/v2 管线、缓存和评分 | 完成 |
-| ASR development balanced 100 条、四路评测 | 完成；管线验收与故障定位 |
-| ASR validation 分层 320 条、四路 v1/v2 | 完成；8 speaker × 10 noise × 4 SNR |
-| ASR development/validation full | 未运行；当前停止扩样 |
-| DNSMOS P.835 本地评分与配对汇总 | 完成；validation 320 四路共 1,280 条 |
-| VCTK transcript 12,396 条结构映射 | 完成；人工听辨抽查待完成 |
+- 已完成 AISHELL-1 下载、完整性审计和可复现数据划分。
+- 已冻结约 20 小时训练集与 dev/test 评测子集。
+- 已实现四通道 UCA 几何、可控 RT60 RIR 生成、DRR 估计与多通道卷积；已有 200 条 dev RIR。
+- 已实现 Raw、单通道 WPE（10/40 taps）和多通道 WPE（10 taps）四条前端分支。
+- 已实现普通话文本归一化、CER、替换/删除/插入统计和 paired bootstrap。
+- 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
+- 已完成协议校验、数据泄漏检查和自动测试。
+- 尚未运行正式冻结基线、WPE 消融和 LoRA 训练。
 
-ASR validation 分层 320 条（四路 1,280 输入）上的 v1 corpus WER：
+## 仓库结构
 
-| 输入或策略 | WER |
-|---|---:|
-| clean | `1.57%` |
-| noisy | `5.99%` |
-| MCRA + DD-Wiener | `6.58%`；相对 noisy `+0.59 pp`，区间跨零 |
-| RNNoise v1 固定解码 | `14.60%`；相对 noisy `+8.61 pp` |
-| RNNoise v2 灾难保护 | `11.93%` selective WER；coverage `99.69%` |
-| RNNoise/noisy reference oracle | `5.13%`，不可部署 |
-
-RNNoise v1 的 paired bootstrap 95% CI 为 `+5.90` 到 `+11.55 pp`；8/8 个说话人、所有
-leave-one-speaker-out、去掉影响最大样本以及 babble/非 babble 分组均保持“比 noisy 更差”。
-这已满足当前预设的最小计算停止条件，因此暂不扩到 full。它支持本数据与固定 Whisper
-协议下的结论，不外推到所有 ASR 后端。MCRA 的区间跨零，仍只能称“未证明有收益”。
-RNNoise/noisy reference oracle 也只把 WER 从 `5.99%` 降到 `5.13%`（最多减少 22 个词错误）；
-考虑真实 router 必然低于 oracle 且增加双路推理成本，当前不把重新设计 router 作为近期主线。
-
-同一批 320 条上的 DNSMOS 显示：RNNoise 相对 noisy 的 `SIG/BAK/OVRL` 平均分别提高
-`+0.251/+1.306/+0.615`，但 WER 同时从 `5.99%` 升至 `14.60%`。逐条看，RNNoise 的 OVRL
-在 307/320 条上提高，其中 73 条的 ASR 词错误反而增加；OVRL delta 与 ASR 词错误减少的
-Spearman 相关仅 `0.055`。因此 DNSMOS 用于无参考感知质量监测，不用作 ASR router 或前端
-选择标准。
-
-## 项目手册
-
-手册压缩为五章：
-
-1. [项目、数据与贡献边界](docs/handbook/01_项目数据与贡献边界.md)
-2. [算法架构与实时工程](docs/handbook/02_算法架构与实时工程.md)
-3. [代码运行与复现](docs/handbook/03_代码运行与复现.md)
-4. [实验结果与 ASR 分析](docs/handbook/04_实验结果与ASR分析.md)
-5. [面试问答与公式速查](docs/handbook/05_面试问答与公式速查.md)
-
-总入口见 [项目手册索引](docs/handbook/README.md)。
-
-## 下一阶段：普通话混响鲁棒 ASR
-
-仓库计划在保留当前英文降噪实验和结论的基础上，新增普通话远场混响鲁棒 ASR 主线：使用
-可控四通道 RIR、单/多通道 WPE、Whisper LoRA 多条件训练和 paired CER 评测。当前详细方案见
-[普通话混响鲁棒 ASR：项目改造与实验计划](docs/robust_asr/00_普通话混响鲁棒ASR改造与实验计划.md)。
-
-已完成的范围、数据审计和冻结基线烟雾结果见
-[执行记录与复现](docs/robust_asr/01_执行记录与复现.md)。20 小时 LoRA 和正式 test 消融仍待
-Linux + RTX 4070 阶段执行；计划文档中的正式实验规模和性能数值仍不是已完成结果。
-
-无需下载数据即可校验冻结协议和运行合成 WPE smoke：
-
-```bash
-./.venv/bin/python scripts/robust_asr/validate_protocol.py
-./.venv/bin/python scripts/robust_asr/run_synthetic_wpe_smoke.py --seconds 0.4
-./.venv/bin/python -m pytest tests/test_robust_asr_*.py -q
+```text
+configs/robust_asr/              冻结实验协议、数据和模型配置
+src/robust_asr/
+  acoustics/                    阵列几何、RIR 仿真、DRR 与卷积
+  dereverb/                     单/多通道 WPE 前端
+  models/                       Whisper 推理与 LoRA 配置
+  aishell.py                    AISHELL 数据发现和划分
+  baseline.py                   基线实验编排
+  manifest.py                   JSONL manifest 与哈希
+  scoring.py                    中文 CER 和统计检验
+scripts/robust_asr/              可复现实验命令入口
+tests/                           鲁棒 ASR 自动测试
+docs/robust_asr/                 实验计划、执行记录和项目总结
 ```
 
-在已挂载数据盘的环境中，可安装正式依赖并复现已完成的 manifest 与烟雾基线：
+完整职责和本次清理记录见
+[代码架构与清理记录](docs/robust_asr/03_代码架构与清理记录.md)。
+
+## 快速验证
 
 ```bash
 python3 -m venv .venv-robust-asr
-./.venv-robust-asr/bin/pip install -e '.[robust-asr,dev]'
+./.venv-robust-asr/bin/pip install -e '.[asr,train,evaluation,dev]'
+./.venv-robust-asr/bin/python scripts/robust_asr/validate_protocol.py
+./.venv-robust-asr/bin/python -m pytest
+```
+
+准备数据并生成开发集 RIR：
+
+```bash
 export ROBUST_ASR_DATA_ROOT=/path/to/robust_asr
 ./.venv-robust-asr/bin/python scripts/robust_asr/prepare_aishell.py
+./.venv-robust-asr/bin/python scripts/robust_asr/generate_rir_bank.py --split dev
+```
+
+在具备 GPU、本地 Whisper 权重和已准备数据的服务器上运行冻结基线：
+
+```bash
 ./.venv-robust-asr/bin/python scripts/robust_asr/run_frozen_whisper_baseline.py \
-  --device cpu --local-files-only
+  --device cuda --local-files-only
 ```
 
-## 快速开始
+## 数据边界
 
-```bash
-python3 -m venv .venv
-./.venv/bin/pip install -e '.[data,dev,evaluation,demo]'
-./scripts/setup_rnnoise.sh
-./.venv/bin/python -m pytest
-```
+原始语音、RIR、模型权重、训练检查点和实验输出不进入 Git。仓库只保存代码、冻结协议、
+测试和结论文档；本地用于开发代码，Linux 服务器保存正式数据并承担 GPU 实验。
 
-无参考感知质量评分额外安装固定 ONNX Runtime：
+## 文档
 
-```bash
-./.venv/bin/python -m pip install -e '.[perceptual]'
-```
-
-增强单个 16/48 kHz mono WAV：
-
-```bash
-./.venv/bin/python scripts/enhance_rnnoise.py \
-  --input input.wav \
-  --output output_rnnoise.wav \
-  --mode official \
-  --compensate-delay
-```
-
-真实流式系统必须保留因果延迟；`--compensate-delay` 只用于离线 paired evaluation。
-完整数据、Demo、ASR v1/v2 命令见[代码运行与复现](docs/handbook/03_代码运行与复现.md)。
-
-## 主要代码
-
-```text
-src/speech_frontend/             音频、STFT、VAD、经典增强和 RNNoise 流式实现
-scripts/                         数据、评测、Demo 和 ASR CLI
-configs/                         数据源、冻结增强和 ASR 协议
-tests/                           自动测试
-docs/figures/                    只提交 PNG 文档图
-```
-
-原始数据、模型权重、可重建大体积 WAV 和全量 ASR 缓存保留在 T7，不进入 Git。
+1. [项目改造与实验计划](docs/robust_asr/00_普通话混响鲁棒ASR改造与实验计划.md)
+2. [执行记录与复现](docs/robust_asr/01_执行记录与复现.md)
+3. [项目结论与简历面试叙事](docs/robust_asr/02_项目结论与简历面试叙事.md)
+4. [代码架构与清理记录](docs/robust_asr/03_代码架构与清理记录.md)

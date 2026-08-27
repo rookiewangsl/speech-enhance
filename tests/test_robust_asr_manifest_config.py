@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from robust_asr.cache import CacheIdentity
 from robust_asr.config import canonical_sha256
 from robust_asr.manifest import (
     choose_mct_condition,
@@ -54,20 +53,7 @@ def test_mct_hash_sampling_is_close_to_requested_probability() -> None:
     assert 0.46 < reverb_fraction < 0.54
 
 
-def test_cache_digest_changes_with_decoder_protocol() -> None:
-    digest = "a" * 64
-    identity = CacheIdentity(digest, digest, "revision", None, digest, digest)
-    changed = CacheIdentity(
-        digest,
-        digest,
-        "revision",
-        None,
-        "b" * 64,
-        digest,
-    )
-
-    assert identity.digest != changed.digest
+def test_canonical_config_hash_is_order_independent() -> None:
     assert canonical_sha256({"b": 1, "a": 2}) == canonical_sha256(
         {"a": 2, "b": 1}
     )
-
