@@ -28,6 +28,7 @@ LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复
 - Linux RTX 4070 上的本地权重加载、真实语音 GPU 推理与 LoRA forward/backward 验收；
 - 500 条开发集上的 Clean+Raw 五档 RT60 正式基线、成对置信区间与条件化 DRR 分析；
 - Clean/MCT 训练 Dataset、epoch 级确定性 train RIR 采样、文件校验与 Whisper batch collator；
+- 正式 test RIR 的同几何 family 跨 RT60 配对生成逻辑及回归测试；
 - 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
@@ -369,7 +370,7 @@ RT60 档内的差异。由于卷积后会统一归一化到目标 RMS，本阶�
 生成器最多迭代五次调整设计 RT60；仍不满足时该 RIR 不得进入 bank。五档实验条件按目标 RT60
 分组，同时报告各档四通道实测值；Mic 0 作为 Raw ASR 参考通道，其他通道实测值全部保存。
 
-Train/dev/test 的 room ID、几何模板和生成 seed 必须完全隔离。新生成的正式 test bank 使用
+Train/dev/test 的 room ID、几何模板和生成 seed 必须完全隔离。待生成的正式 test bank 使用
 RIR family：不同 family 之间的距离仍在 `1–4 m` 内随机，同一 family 内固定房间、阵列、声源位置、
 距离和方位角，只生成五个不同 RT60 版本。这样同时保留距离/DRR 多样性与 RT60 严格配对性。
 

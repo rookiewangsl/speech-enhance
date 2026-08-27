@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
+from robust_asr.acoustics import bank
+from robust_asr.acoustics.bank import generate_rir_bank
 from robust_asr.acoustics.geometry import (
     GeometryProtocol,
     sample_scene_geometry,
@@ -13,6 +17,7 @@ from robust_asr.acoustics.rir import (
     direct_to_reverberant_ratio,
     rt60_within_tolerance,
 )
+from robust_asr.manifest import read_jsonl
 
 
 def test_scene_geometry_is_deterministic_and_valid() -> None:
@@ -87,3 +92,67 @@ def test_pyroom_randomized_ism_is_reproducible_when_installed() -> None:
 
     assert np.array_equal(first.full, second.full)
     assert first.metadata() == second.metadata()
+
+
+def _fake_simulation(scene, *, target_rt60_seconds, seed):
+    from robust_asr.acoustics.pyroom import SimulatedRIR
+
+    full = np.zeros((4, 8), dtype=np.float32)
+    full[:, 0] = 1.0
+    direct = full[:, :1].copy()
+    return SimulatedRIR(
+        full=full,
+        direct=direct,
+        target_rt60_seconds=float(target_rt60_seconds),
+        measured_rt60_seconds=(target_rt60_seconds,) * 4,
+        design_rt60_seconds=float(target_rt60_seconds),
+        absorption=0.5,
+        max_order=1,
+        drr_db=(10.0,) * 4,
+        seed=seed,
+        calibration_iterations=1,
+    )
+
+
+def test_formal_test_rir_families_pair_geometry_across_rt60(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(bank, "simulate_calibrated_rir", _fake_simulation)
+
+    audit = generate_rir_bank(
+        tmp_path,
+        split="test",
+        rooms=1,
+        positions_per_target=2,
+        fixed_rt60_seconds=(0.2, 0.8),
+    )
+    rows = read_jsonl(tmp_path / "test.jsonl")
+
+    assert audit["rirs"] == 4
+    assert audit["geometry_families"] == 2
+    assert audit["paired_rt60_geometry"] is True
+    families = {row["rir_family_id"] for row in rows}
+    for family in families:
+        values = [row for row in rows if row["rir_family_id"] == family]
+        assert {row["target_rt60_seconds"] for row in values} == {0.2, 0.8}
+        assert len({row["geometry_id"] for row in values}) == 1
+        assert len({json.dumps(row["scene"], sort_keys=True) for row in values}) == 1
+
+
+def test_dev_rir_geometry_remains_independent_per_rt60(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(bank, "simulate_calibrated_rir", _fake_simulation)
+
+    audit = generate_rir_bank(
+        tmp_path,
+        split="dev",
+        rooms=1,
+        positions_per_target=2,
+        fixed_rt60_seconds=(0.2, 0.8),
+    )
+    rows = read_jsonl(tmp_path / "dev.jsonl")
+
+    assert audit["rirs"] == 4
+    assert audit["geometry_families"] == 4
+    assert audit["paired_rt60_geometry"] is False
+    assert len({row["geometry_id"] for row in rows}) == 4
+    assert len({json.dumps(row["scene"], sort_keys=True) for row in rows}) == 4

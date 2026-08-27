@@ -14,6 +14,7 @@
 - 已完成 AISHELL-1 下载、完整性审计和可复现数据划分。
 - 已冻结约 20 小时训练集与 dev/test 评测子集。
 - 已实现四通道 UCA 几何、可控 RT60 RIR 生成、DRR 估计与多通道卷积；已有 200 条 dev RIR。
+- 已实现正式 test RIR 的同几何 family 跨 RT60 配对生成协议；test bank 尚未生成。
 - 已实现 Raw、单通道 WPE（10/40 taps）和多通道 WPE（10 taps）四条前端分支。
 - 已实现普通话文本归一化、CER、替换/删除/插入统计和 paired bootstrap。
 - 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
