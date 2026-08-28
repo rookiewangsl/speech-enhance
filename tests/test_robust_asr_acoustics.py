@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from robust_asr.acoustics import bank
-from robust_asr.acoustics.bank import generate_rir_bank
+from robust_asr.acoustics.bank import RIRBankProgress, generate_rir_bank
 from robust_asr.acoustics.geometry import (
     GeometryProtocol,
     sample_scene_geometry,
@@ -136,7 +136,26 @@ def test_formal_test_rir_families_pair_geometry_across_rt60(
         values = [row for row in rows if row["rir_family_id"] == family]
         assert {row["target_rt60_seconds"] for row in values} == {0.2, 0.8}
         assert len({row["geometry_id"] for row in values}) == 1
-        assert len({json.dumps(row["scene"], sort_keys=True) for row in values}) == 1
+    assert len({json.dumps(row["scene"], sort_keys=True) for row in values}) == 1
+
+
+def test_rir_bank_reports_deterministic_progress(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(bank, "simulate_calibrated_rir", _fake_simulation)
+    events: list[RIRBankProgress] = []
+
+    generate_rir_bank(
+        tmp_path,
+        split="test",
+        rooms=1,
+        positions_per_target=2,
+        fixed_rt60_seconds=(0.2, 0.8),
+        progress_callback=events.append,
+    )
+
+    assert events[0].completed == 0
+    assert events[0].total == 4
+    assert [event.completed for event in events[1:]] == [1, 2, 3, 4]
+    assert events[-1].rir_id == "test_r000_f001_t001"
 
 
 def test_dev_rir_geometry_remains_independent_per_rt60(tmp_path, monkeypatch) -> None:

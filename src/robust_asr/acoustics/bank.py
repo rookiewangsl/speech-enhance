@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
@@ -21,6 +22,15 @@ from .geometry import (
 from .pyroom import simulate_calibrated_rir
 
 RIRSplit = Literal["train", "dev", "test", "smoke"]
+
+
+@dataclass(frozen=True)
+class RIRBankProgress:
+    split: RIRSplit
+    completed: int
+    total: int
+    rir_id: str | None
+    target_rt60_seconds: float | None
 
 
 def _targets_for_room(
@@ -85,6 +95,7 @@ def generate_rir_bank(
     fixed_rt60_seconds: Sequence[float] = (0.2, 0.4, 0.6, 0.8, 1.0),
     seed: int = 2026,
     protocol: GeometryProtocol | None = None,
+    progress_callback: Callable[[RIRBankProgress], None] | None = None,
 ) -> dict[str, Any]:
     """Generate one bank, its manifest, and a content-identity audit."""
 
@@ -103,7 +114,22 @@ def generate_rir_bank(
     array_root.mkdir(parents=True, exist_ok=True)
     settings = protocol or GeometryProtocol()
     split_offset = {"train": 0, "dev": 1_000_000, "test": 2_000_000, "smoke": 3_000_000}[split]
+    total = (
+        rooms * train_positions_per_room
+        if split == "train"
+        else rooms * positions_per_target * len(fixed_rt60_seconds)
+    )
     rows: list[dict[str, Any]] = []
+    if progress_callback is not None:
+        progress_callback(
+            RIRBankProgress(
+                split=split,
+                completed=0,
+                total=total,
+                rir_id=None,
+                target_rt60_seconds=None,
+            )
+        )
     for room_index in range(rooms):
         room_seed = seed + split_offset + room_index * 10_000
         room_dimensions = sample_room_dimensions(room_seed, settings)
@@ -166,6 +192,16 @@ def generate_rir_bank(
                         **simulated.metadata(),
                     }
                 )
+                if progress_callback is not None:
+                    progress_callback(
+                        RIRBankProgress(
+                            split=split,
+                            completed=len(rows),
+                            total=total,
+                            rir_id=rir_id,
+                            target_rt60_seconds=float(target_rt60),
+                        )
+                    )
     manifest_path = root / f"{split}.jsonl"
     write_jsonl_atomic(manifest_path, rows)
     audit = {
