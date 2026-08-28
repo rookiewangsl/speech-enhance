@@ -14,8 +14,8 @@
 - 已完成 AISHELL-1 下载、完整性审计和可复现数据划分。
 - 已冻结约 20 小时训练集与 dev/test 评测子集。
 - 已实现四通道 UCA 几何、可控 RT60 RIR 生成、DRR 估计与多通道卷积；已有 200 条 dev RIR。
-- 已生成正式 test RIR：60 个同几何 family、每个 family 配对五档 RT60，共 300 组；完整
-  train/dev/test 联合校验将在 train bank 完成后执行。
+- 已生成并联合校验正式 train/dev/test RIR：分别为 1,000/200/300 组、房间完全隔离；test 包含
+  60 个同几何 family，每个 family 配对五档 RT60。
 - 已实现 Raw、单通道 WPE（10/40 taps）和多通道 WPE（10 taps）四条前端分支。
 - 已实现普通话文本归一化、CER、替换/删除/插入统计和 paired bootstrap。
 - 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
@@ -29,7 +29,8 @@
   M-WPE-10 没有收益且存在插入错误风险，因此只作为已知混响条件的实验前端。
 - 已完成 greedy/beam 解码对照：Beam-5 改善 clean 子集绝对 CER，但不改变 M-WPE 的收益方向；
   为保持全矩阵可比性，主实验继续统一 greedy，Beam-5 只作最佳模型的可选二级结果。
-- 正在生成正式 train RIR；尚未执行 LoRA 训练和封存 test 评测。
+- 已生成严格嵌套的 5/10/20 小时训练 manifest，并完成正式 dev evaluator、可恢复训练 CLI 与
+  clean CER 安全门；W0 `dev_model` 冻结基线正在运行。尚未执行 LoRA 训练和封存 test 评测。
 
 ## 仓库结构
 

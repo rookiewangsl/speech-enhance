@@ -2,8 +2,9 @@
 
 最后更新：2026-08-28
 状态：方案 v0.4；AISHELL-1、开发集 RIR、Linux GPU 环境、LoRA 反向链路、正式 Raw/WPE 开发集
-基线和无反射前端审计已经验收。正式 test RIR 与可恢复优化循环已完成；train RIR 正在生成，
-dev evaluator/训练 CLI、LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的结果外，
+基线和无反射前端审计已经验收。正式 train/dev/test RIR、可恢复优化循环、dev evaluator 和训练
+CLI 已完成；W0 `dev_model` 基线正在运行，LoRA 训练与 test 消融尚未执行。除
+[执行记录](01_执行记录与复现.md)明确列出的结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
 
@@ -31,6 +32,8 @@ dev evaluator/训练 CLI、LoRA 训练与 test 消融尚未执行。除[执行�
 - Clean/MCT 训练 Dataset、epoch 级确定性 train RIR 采样、文件校验与 Whisper batch collator；
 - 正式 test RIR 的同几何 family 跨 RT60 配对生成逻辑、300 组 bank 及结构审计；
 - 可恢复 LoRA 优化循环、多核数据预取、结构化日志和 clean CER 安全门 checkpoint 选择；
+- 严格嵌套的 5/10/20 小时训练 manifest、正式 dev evaluator 和训练 CLI；
+- train/dev/test 共 1,500 组 RIR 的文件哈希、数组、RT60、inventory 与 room/geometry 隔离联合校验；
 - 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
@@ -44,8 +47,9 @@ dev evaluator/训练 CLI、LoRA 训练与 test 消融尚未执行。除[执行�
 ./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：完成 train RIR bank 与 train/dev/test 联合校验、greedy/beam 决策、正式 dev evaluator、
-训练 CLI、LoRA 训练和 test 推理。Linux + RTX 4070 环境统一安装 `.[asr,train,evaluation,dev]`。
+仍待执行：完成正在运行的 W0 `dev_model` 基线；在用户允许训练后执行 100-step 算力闸门、LoRA
+位置短程消融、Clean/MCT 正式训练和 test 推理。Linux + RTX 4070 环境统一安装
+`.[asr,train,evaluation,dev]`。
 
 ## 1. 项目定位
 
