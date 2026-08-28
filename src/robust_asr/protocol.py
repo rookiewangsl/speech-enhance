@@ -139,6 +139,9 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
             "revision",
             "model_pt_sha256",
             "funasr_version",
+            "torch_version",
+            "environment",
+            "fbank_backend",
             "vad_model",
             "punctuation_model",
             "language_model",
@@ -208,6 +211,10 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
     ):
         raise ValueError("Paraformer cross-check must not use auxiliary models")
     _positive_int(paraformer["cpu_threads"], name="Paraformer cpu_threads")
+    if paraformer["environment"] != "shared_robust_asr":
+        raise ValueError("Paraformer must reuse the robust-asr environment")
+    if paraformer["fbank_backend"] != "kaldi-native-fbank==1.22.3":
+        raise ValueError("Paraformer fbank backend must be pinned")
     if lora["rank"] != 8:
         raise ValueError("v0.1 fixes LoRA rank=8")
     if lora["task_type"] is not None:
@@ -337,6 +344,6 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
             ("accelerate", "datasets", "peft")
         ),
         missing_cross_model_dependencies=_missing_dependencies(
-            ("funasr", "torchaudio")
+            ("funasr", "kaldi_native_fbank")
         ),
     )
