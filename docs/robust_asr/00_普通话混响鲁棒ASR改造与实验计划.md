@@ -469,6 +469,10 @@ condition_on_prev_tokens: false
 greedy decoding 用于所有主表，保证确定性和计算可控。最终最佳模型可额外报告 beam 5，但不能
 和主表的 greedy 结果混用。
 
+开发集 100 条解码敏感性审计已经支持该边界：Beam-5 显著改善 clean 子集，但在 RT60=0.8 s 的
+Raw/M-WPE 条件上相对 greedy 的区间跨零；M-WPE 在 Beam-5 下仍显著优于 Raw。因此不重跑既有
+W0 主矩阵，正式训练和 checkpoint 选择继续使用 greedy，Beam-5 只作最终最佳模型的二级报告。
+
 ### 10.2 LoRA 固定参数
 
 ```yaml
