@@ -33,6 +33,8 @@
   同向，但单通道 WPE 存在“信号指标改善、CER 恶化”，证明前端必须按下游指标选择。
 - 已生成严格嵌套的 5/10/20 小时训练 manifest，并完成正式 dev evaluator、可恢复训练 CLI 与
   clean CER 安全门；W0 `dev_model` 冻结基线正在运行。尚未执行 LoRA 训练和封存 test 评测。
+- 已冻结经典离线 Paraformer `v2.0.4` 权重及 SHA-256，并在独立 FunASR 环境完成 GPU
+  冒烟验证；跨模型实验仅比较 Raw 与 M-WPE，不引入 VAD、标点、语言模型或热词。
 
 ## 仓库结构
 
@@ -77,6 +79,16 @@ export ROBUST_ASR_DATA_ROOT=/path/to/robust_asr
 ```bash
 ./.venv-robust-asr/bin/python scripts/robust_asr/run_frozen_whisper_baseline.py \
   --device cuda --local-files-only
+```
+
+Paraformer 跨模型验证使用独立环境；不要把 FunASR 安装进 Whisper 训练环境：
+
+```bash
+python3 -m venv ~/.venvs/paraformer-crosscheck
+~/.venvs/paraformer-crosscheck/bin/python -m pip install \
+  -r requirements/paraformer-crosscheck.txt
+PYTHONPATH=src ~/.venvs/paraformer-crosscheck/bin/python \
+  scripts/robust_asr/run_frozen_paraformer_baseline.py --device cuda
 ```
 
 ## 数据边界

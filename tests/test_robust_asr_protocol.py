@@ -21,6 +21,7 @@ def test_frozen_protocol_validates_without_data_or_models() -> None:
     assert summary.frontend_count == 4
     assert summary.rt60_count == 5
     assert summary.formal_reverb_inputs == 60_000
+    assert summary.cross_model_inputs == 5_500
     assert len(summary.protocol_sha256) == 64
 
 

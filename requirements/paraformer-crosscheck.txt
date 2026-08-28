@@ -1,0 +1,4 @@
+# Keep the FunASR cross-model environment isolated from Whisper training.
+torch==2.8.0
+torchaudio==2.8.0
+funasr==1.4.5

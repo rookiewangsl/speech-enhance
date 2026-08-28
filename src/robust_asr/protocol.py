@@ -20,6 +20,7 @@ CONFIG_FILES = (
     "rir.json",
     "wpe.json",
     "whisper.json",
+    "paraformer.json",
     "lora.json",
     "evaluation.json",
 )
@@ -34,8 +35,10 @@ class ProtocolSummary:
     frontend_count: int
     rt60_count: int
     formal_reverb_inputs: int
+    cross_model_inputs: int
     missing_baseline_dependencies: tuple[str, ...]
     missing_training_dependencies: tuple[str, ...]
+    missing_cross_model_dependencies: tuple[str, ...]
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -46,11 +49,15 @@ class ProtocolSummary:
             "frontend_count": self.frontend_count,
             "rt60_count": self.rt60_count,
             "formal_reverb_inputs": self.formal_reverb_inputs,
+            "cross_model_inputs": self.cross_model_inputs,
             "missing_baseline_dependencies": list(
                 self.missing_baseline_dependencies
             ),
             "missing_training_dependencies": list(
                 self.missing_training_dependencies
+            ),
+            "missing_cross_model_dependencies": list(
+                self.missing_cross_model_dependencies
             ),
         }
 
@@ -99,6 +106,7 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
     rir = configs["rir"]
     wpe = configs["wpe"]
     whisper = configs["whisper"]
+    paraformer = configs["paraformer"]
     lora = configs["lora"]
     evaluation = configs["evaluation"]
 
@@ -123,6 +131,24 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
             "task",
         },
         context="whisper",
+    )
+    require_keys(
+        paraformer,
+        {
+            "model_id",
+            "revision",
+            "model_pt_sha256",
+            "funasr_version",
+            "vad_model",
+            "punctuation_model",
+            "language_model",
+            "hotword",
+            "cross_model_frontends",
+            "cross_model_rt60_seconds",
+            "cross_model_utterances",
+            "cpu_threads",
+        },
+        context="paraformer",
     )
     require_keys(
         lora,
@@ -165,6 +191,23 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         raise ValueError("Whisper model SHA-256 must be pinned")
     if whisper["language"] != "zh" or whisper["task"] != "transcribe":
         raise ValueError("Whisper must use zh transcription")
+    if paraformer["model_id"] != (
+        "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+    ):
+        raise ValueError("cross-model validation must use classic offline Paraformer")
+    if paraformer["revision"] != "v2.0.4":
+        raise ValueError("Paraformer revision must be v2.0.4")
+    if (
+        not isinstance(paraformer["model_pt_sha256"], str)
+        or len(paraformer["model_pt_sha256"]) != 64
+    ):
+        raise ValueError("Paraformer model SHA-256 must be pinned")
+    if any(
+        paraformer[field] is not None
+        for field in ("vad_model", "punctuation_model", "language_model", "hotword")
+    ):
+        raise ValueError("Paraformer cross-check must not use auxiliary models")
+    _positive_int(paraformer["cpu_threads"], name="Paraformer cpu_threads")
     if lora["rank"] != 8:
         raise ValueError("v0.1 fixes LoRA rank=8")
     if lora["task_type"] is not None:
@@ -241,6 +284,20 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         raise ValueError("heavy RT60 values must be a non-empty evaluation subset")
     if tuple(wpe["conditions"]) != tuple(value.value for value in frontends):
         raise ValueError("WPE and evaluation frontend order disagree")
+    paraformer_frontends = tuple(paraformer["cross_model_frontends"])
+    if paraformer_frontends != ("raw", "m_wpe_10"):
+        raise ValueError("Paraformer cross-check must compare Raw and M-WPE-10")
+    paraformer_rt60 = tuple(
+        float(value) for value in paraformer["cross_model_rt60_seconds"]
+    )
+    if paraformer_rt60 != rt60:
+        raise ValueError("Paraformer and primary evaluation RT60 grids disagree")
+    paraformer_utterances = _positive_int(
+        paraformer["cross_model_utterances"],
+        name="Paraformer cross_model_utterances",
+    )
+    if paraformer_utterances != data["dev_frontend_utterances"]:
+        raise ValueError("Paraformer and frontend dev utterance counts disagree")
     if set(models) != set(ModelCondition):
         raise ValueError("formal evaluation must include W0/W1/W2")
     if set(frontends) != set(FrontendCondition):
@@ -265,6 +322,8 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         frontend_count=len(frontends),
         rt60_count=len(rt60),
         formal_reverb_inputs=total_asr_inputs(matrix),
+        cross_model_inputs=paraformer_utterances
+        * (1 + len(paraformer_frontends) * len(paraformer_rt60)),
         missing_baseline_dependencies=_missing_dependencies(
             (
                 "pyroomacoustics",
@@ -276,5 +335,8 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         ),
         missing_training_dependencies=_missing_dependencies(
             ("accelerate", "datasets", "peft")
+        ),
+        missing_cross_model_dependencies=_missing_dependencies(
+            ("funasr", "torchaudio")
         ),
     )

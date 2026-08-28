@@ -7,7 +7,7 @@ build/
 
 # Data, models, experiment state, and generated outputs live outside Git.
 data/
-models/
+/models/
 outputs/
 runs/
 cache/
