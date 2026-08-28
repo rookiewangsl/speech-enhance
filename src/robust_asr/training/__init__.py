@@ -10,6 +10,11 @@ from robust_asr.training.engine import (
     TrainingResult,
     run_lora_training,
 )
+from robust_asr.training.evaluation import (
+    LoadedWhisperTranscriber,
+    WhisperDevEvaluator,
+    trainable_parameter_sha256,
+)
 from robust_asr.training.benchmark import (
     BenchmarkConfig,
     BenchmarkResult,
@@ -41,6 +46,7 @@ __all__ = [
     "EvaluationSummary",
     "DevCheckpointMetrics",
     "EpochEvaluation",
+    "LoadedWhisperTranscriber",
     "RunOverview",
     "StructuredTrainingLogger",
     "TrainingCompletion",
@@ -50,7 +56,9 @@ __all__ = [
     "TrainingReporter",
     "WhisperAdaptationDataset",
     "WhisperBatchCollator",
+    "WhisperDevEvaluator",
     "optimizer_steps_per_epoch",
     "run_lora_optimizer_benchmark",
     "run_lora_training",
+    "trainable_parameter_sha256",
 ]
