@@ -11,6 +11,8 @@ def test_benchmark_config_freezes_effective_batch_size() -> None:
 
     assert config.optimizer_steps == 100
     assert config.effective_batch_size == 16
+    assert config.num_workers == 16
+    assert config.prefetch_factor == 4
 
 
 def test_optimizer_steps_per_epoch_uses_ceil_for_both_levels() -> None:
@@ -27,6 +29,7 @@ def test_optimizer_steps_per_epoch_uses_ceil_for_both_levels() -> None:
         ({"optimizer_steps": 0}, "optimizer_steps"),
         ({"warmup_ratio": 1.1}, "warmup_ratio"),
         ({"num_workers": -1}, "num_workers"),
+        ({"prefetch_factor": 0}, "prefetch_factor"),
     ],
 )
 def test_benchmark_config_rejects_invalid_values(kwargs, message) -> None:

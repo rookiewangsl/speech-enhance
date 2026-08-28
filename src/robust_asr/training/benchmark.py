@@ -21,7 +21,8 @@ class BenchmarkConfig:
     warmup_ratio: float = 0.05
     max_grad_norm: float = 1.0
     seed: int = 2026
-    num_workers: int = 4
+    num_workers: int = 16
+    prefetch_factor: int = 4
     ema_decay: float = 0.95
 
     def __post_init__(self) -> None:
@@ -35,6 +36,12 @@ class BenchmarkConfig:
                 raise ValueError(f"{name} must be a positive integer")
         if not isinstance(self.num_workers, int) or self.num_workers < 0:
             raise ValueError("num_workers must be a non-negative integer")
+        if (
+            not isinstance(self.prefetch_factor, int)
+            or isinstance(self.prefetch_factor, bool)
+            or self.prefetch_factor <= 0
+        ):
+            raise ValueError("prefetch_factor must be a positive integer")
         for name in ("learning_rate", "max_grad_norm"):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value <= 0:
@@ -139,16 +146,19 @@ def run_lora_optimizer_benchmark(
     scaler = torch.amp.GradScaler("cuda", enabled=True)
     generator = torch.Generator()
     generator.manual_seed(config.seed)
-    loader = DataLoader(
-        dataset,
-        batch_size=config.per_device_batch_size,
-        shuffle=True,
-        collate_fn=collator,
-        num_workers=config.num_workers,
-        persistent_workers=False,
-        pin_memory=True,
-        generator=generator,
-    )
+    loader_kwargs: dict[str, Any] = {
+        "dataset": dataset,
+        "batch_size": config.per_device_batch_size,
+        "shuffle": True,
+        "collate_fn": collator,
+        "num_workers": config.num_workers,
+        "persistent_workers": False,
+        "pin_memory": True,
+        "generator": generator,
+    }
+    if config.num_workers > 0:
+        loader_kwargs["prefetch_factor"] = config.prefetch_factor
+    loader = DataLoader(**loader_kwargs)
 
     optimizer.zero_grad(set_to_none=True)
     optimizer_step = 0

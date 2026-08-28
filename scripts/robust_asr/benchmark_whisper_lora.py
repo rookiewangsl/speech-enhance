@@ -41,7 +41,8 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--optimizer-steps", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--gradient-accumulation", type=int, default=8)
-    parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--num-workers", type=int)
+    parser.add_argument("--prefetch-factor", type=int)
     parser.add_argument("--console-every", type=int, default=20)
     parser.add_argument("--output-name")
     parser.add_argument("--local-files-only", action="store_true")
@@ -82,7 +83,16 @@ def main() -> None:
         warmup_ratio=float(lora_config["warmup_ratio"]),
         max_grad_norm=float(lora_config["max_grad_norm"]),
         seed=int(lora_config["seed"]),
-        num_workers=args.num_workers,
+        num_workers=(
+            int(lora_config["dataloader_num_workers"])
+            if args.num_workers is None
+            else args.num_workers
+        ),
+        prefetch_factor=(
+            int(lora_config["dataloader_prefetch_factor"])
+            if args.prefetch_factor is None
+            else args.prefetch_factor
+        ),
     )
     default_name = (
         f"benchmark_{args.mode}_{target.value}_"

@@ -132,6 +132,8 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
             "peft_wrapper",
             "pilot_targets",
             "formal_runs",
+            "dataloader_num_workers",
+            "dataloader_prefetch_factor",
             "logging",
         },
         context="lora",
@@ -188,6 +190,10 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         "effective_batch_size"
     ]:
         raise ValueError("LoRA effective batch size is inconsistent")
+    for field in ("dataloader_num_workers", "dataloader_prefetch_factor"):
+        value = lora[field]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"LoRA {field} must be a positive integer")
     logging = lora["logging"]
     if not isinstance(logging, Mapping):
         raise ValueError("LoRA logging config must be an object")

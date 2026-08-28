@@ -522,6 +522,8 @@ precision: fp16
 per_device_train_batch_size: 2
 gradient_accumulation_steps: 8
 effective_batch_size: 16
+dataloader_num_workers: 16
+dataloader_prefetch_factor: 4
 optimizer: AdamW
 learning_rate: 1.0e-4
 weight_decay: 0.01
@@ -540,7 +542,9 @@ logging:
 
 batch 2 OOM 时改成 batch 1、accumulation 16，保持有效 batch 不变。当前 Whisper encoder 要求固定
 3000 帧 log-Mel 输入，因此批处理明确补齐到 30 秒，并在进入特征提取前拒绝超长样本，不宣称采用
-动态特征 padding 降低计算量。正式训练前运行 100 optimizer steps，记录 step time、峰值显存、
+动态特征 padding 降低计算量。训练数据加载默认使用 16 个 CPU worker 和每 worker 4 个预取 batch，
+服务器 CPU 不作为稀缺资源；若 GPU 利用率仍有明显空洞，再提高 worker 数而不改变实验协议。
+正式训练前运行 100 optimizer steps，记录 step time、峰值显存、
 音频吞吐和预计总时长：
 
 1. 单次预计 `<=8 h`：20 h、最多 3 epoch；
