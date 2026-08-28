@@ -14,16 +14,20 @@
 - 已完成 AISHELL-1 下载、完整性审计和可复现数据划分。
 - 已冻结约 20 小时训练集与 dev/test 评测子集。
 - 已实现四通道 UCA 几何、可控 RT60 RIR 生成、DRR 估计与多通道卷积；已有 200 条 dev RIR。
-- 已实现正式 test RIR 的同几何 family 跨 RT60 配对生成协议；test bank 尚未生成。
+- 已生成正式 test RIR：60 个同几何 family、每个 family 配对五档 RT60，共 300 组；完整
+  train/dev/test 联合校验将在 train bank 完成后执行。
 - 已实现 Raw、单通道 WPE（10/40 taps）和多通道 WPE（10 taps）四条前端分支。
 - 已实现普通话文本归一化、CER、替换/删除/插入统计和 paired bootstrap。
 - 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
 - 已完成协议校验、数据泄漏检查和自动测试。
 - 已完成 500 条开发集 Clean+Raw 五档 RT60 基线；Raw CER 从 13.56% 单调上升至 27.36%。
-- 已实现 Clean/MCT 训练 Dataset、epoch 级确定性 RIR 采样和 Whisper batch collator。
+- 已实现 Clean/MCT 训练 Dataset、epoch 级确定性 RIR 采样、Whisper batch collator、可恢复
+  优化循环和带 clean CER 安全门的 checkpoint 选择。
 - 已完成正式 WPE 开发集消融；M-WPE-10 在五档 RT60 均取得最低 CER，且在
   `RT60>=0.4 s` 显著优于两种单通道控制。
-- 正在补充无反射前端损伤和 W0 基线审计；尚未执行 LoRA 训练和封存 test 评测。
+- 已完成 500 条无混响/仅直达声输入审计：响度和传播链路未造成显著 CER 偏差，但无混响时
+  M-WPE-10 没有收益且存在插入错误风险，因此只作为已知混响条件的实验前端。
+- 正在执行 greedy/beam 解码对照和正式 train RIR 生成；尚未执行 LoRA 训练和封存 test 评测。
 
 ## 仓库结构
 

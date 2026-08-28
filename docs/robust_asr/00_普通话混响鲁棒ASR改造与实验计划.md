@@ -1,15 +1,15 @@
 # 普通话混响鲁棒 ASR：项目改造与实验计划
 
 最后更新：2026-08-28
-状态：方案 v0.3；AISHELL-1、开发集 RIR、Linux GPU 环境、LoRA 反向链路和正式 Raw 开发集
-基线已经验收，WPE 开发集消融正在运行。训练 Dataset/Collator 已实现；train/test RIR、优化循环、
-LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的结果外，
+状态：方案 v0.4；AISHELL-1、开发集 RIR、Linux GPU 环境、LoRA 反向链路、正式 Raw/WPE 开发集
+基线和无反射前端审计已经验收。正式 test RIR 与可恢复优化循环已完成；train RIR 正在生成，
+dev evaluator/训练 CLI、LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复现.md)明确列出的结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
 
 ## 0. 当前实施状态
 
-截至 2026-08-26，已完成：
+截至 2026-08-28，已完成：
 
 - `configs/robust_asr/*.json` 六份冻结配置及跨文件 SHA/一致性校验；
 - 中文 NFKC/字符过滤 normalizer、CER、S/D/I 和 paired bootstrap；
@@ -27,8 +27,10 @@ LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复
 - 固定 revision 的 `openai/whisper-small` CPU 开发集烟雾运行，覆盖 clean、三档 RT60 与四路前端；
 - Linux RTX 4070 上的本地权重加载、真实语音 GPU 推理与 LoRA forward/backward 验收；
 - 500 条开发集上的 Clean+Raw 五档 RT60 正式基线、成对置信区间与条件化 DRR 分析；
+- 500 条开发集上的三种 WPE 正式消融，以及 clean/direct-only 六条件前端安全边界审计；
 - Clean/MCT 训练 Dataset、epoch 级确定性 train RIR 采样、文件校验与 Whisper batch collator；
-- 正式 test RIR 的同几何 family 跨 RT60 配对生成逻辑及回归测试；
+- 正式 test RIR 的同几何 family 跨 RT60 配对生成逻辑、300 组 bank 及结构审计；
+- 可恢复 LoRA 优化循环、多核数据预取、结构化日志和 clean CER 安全门 checkpoint 选择；
 - 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
@@ -42,7 +44,7 @@ LoRA 训练与 test 消融尚未执行。除[执行记录](01_执行记录与复
 ./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：完成全量 NARA-WPE 开发集消融、train/test RIR bank、优化循环与 checkpoint/dev 选择、
+仍待执行：完成 train RIR bank 与 train/dev/test 联合校验、greedy/beam 决策、正式 dev evaluator、
 训练 CLI、LoRA 训练和 test 推理。Linux + RTX 4070 环境统一安装 `.[asr,train,evaluation,dev]`。
 
 ## 1. 项目定位
@@ -237,8 +239,8 @@ tests/
 docs/robust_asr/
 ```
 
-优化循环、checkpoint 选择、训练 CLI 和正式结果绘图尚未实现；它们是下一阶段新增项，不应在现状
-清单中伪装成已有文件。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
+优化循环和 checkpoint 选择已经实现并通过本机/Linux 回归测试；正式 dev evaluator、训练 CLI 和
+LoRA 结果绘图尚未实现。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
 
 新代码只进入 `robust_asr` 命名空间，不恢复旧项目模块。
 
