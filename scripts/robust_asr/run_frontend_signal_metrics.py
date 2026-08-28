@@ -50,11 +50,15 @@ def progress_printer(every: int):
         ):
             return
         speed = value.completed_jobs / max(value.elapsed_seconds, 1e-9)
-        eta = (value.total_jobs - value.completed_jobs) / max(speed, 1e-9)
+        eta_text = (
+            "pending"
+            if value.completed_jobs == 0
+            else f"{(value.total_jobs - value.completed_jobs) / speed / 60:.1f} min"
+        )
         print(
             f"Signal metrics {value.completed_jobs}/{value.total_jobs} "
             f"[{100 * value.completed_jobs / value.total_jobs:3.0f}%] "
-            f"| {speed:.2f} job/s | ETA {eta / 60:.1f} min",
+            f"| {speed:.2f} job/s | ETA {eta_text}",
             file=sys.stderr,
             flush=True,
         )
