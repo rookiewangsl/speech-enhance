@@ -7,6 +7,7 @@
   "funasr_version": "1.4.5",
   "torch_version": "2.13.0+cu130",
   "environment": "shared_robust_asr",
+  "fbank_backend": "kaldi-native-fbank==1.22.3",
   "cpu_threads": 32,
   "model_family": "non_autoregressive_paraformer",
   "vad_model": null,
