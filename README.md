@@ -21,7 +21,9 @@
 - 已完成协议校验、数据泄漏检查和自动测试。
 - 已完成 500 条开发集 Clean+Raw 五档 RT60 基线；Raw CER 从 13.56% 单调上升至 27.36%。
 - 已实现 Clean/MCT 训练 Dataset、epoch 级确定性 RIR 采样和 Whisper batch collator。
-- 正式 WPE 开发集消融正在运行；尚未执行 LoRA 训练和封存 test 评测。
+- 已完成正式 WPE 开发集消融；M-WPE-10 在五档 RT60 均取得最低 CER，且在
+  `RT60>=0.4 s` 显著优于两种单通道控制。
+- 正在补充无反射前端损伤和 W0 基线审计；尚未执行 LoRA 训练和封存 test 评测。
 
 ## 仓库结构
 

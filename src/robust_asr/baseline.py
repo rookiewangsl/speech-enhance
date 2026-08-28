@@ -197,6 +197,16 @@ def _paired_deltas(
             if frontend == "raw":
                 continue
             pairs.append(("raw", raw, frontend))
+        if "m_wpe_10" in frontends:
+            for single_channel in ("s_wpe_10", "s_wpe_40"):
+                if single_channel in frontends:
+                    pairs.append(
+                        (
+                            single_channel,
+                            scores.get((single_channel, float(rt60))),
+                            "m_wpe_10",
+                        )
+                    )
         for baseline_name, baseline_scores, candidate_name in pairs:
             candidate_scores = scores.get((candidate_name, float(rt60)))
             if baseline_scores is None or candidate_scores is None:

@@ -9,6 +9,7 @@ import pytest
 
 from robust_asr.baseline import (
     BaselineProgress,
+    _paired_deltas,
     run_frozen_baseline,
     select_speaker_balanced_count,
 )
@@ -160,3 +161,34 @@ def test_end_to_end_baseline_resumes_when_frontends_are_extended(
         "raw",
         "s_wpe_10",
     }
+
+
+def test_paired_deltas_compare_multichannel_with_both_single_channel_controls() -> None:
+    results = [
+        {
+            "utterance_id": "u1",
+            "frontend": frontend,
+            "target_rt60_seconds": 0.6,
+            "reference": "测试语音",
+            "hypothesis": hypothesis,
+        }
+        for frontend, hypothesis in (
+            ("raw", "测试"),
+            ("s_wpe_10", "测试语"),
+            ("s_wpe_40", "测式语音"),
+            ("m_wpe_10", "测试语音"),
+        )
+    ]
+
+    comparisons = _paired_deltas(
+        results,
+        rt60_seconds=(0.6,),
+        frontends=("raw", "s_wpe_10", "s_wpe_40", "m_wpe_10"),
+        draws=100,
+        seed=7,
+    )
+    pairs = {(row["baseline"], row["candidate"]) for row in comparisons}
+
+    assert ("raw", "m_wpe_10") in pairs
+    assert ("s_wpe_10", "m_wpe_10") in pairs
+    assert ("s_wpe_40", "m_wpe_10") in pairs

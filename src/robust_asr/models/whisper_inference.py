@@ -19,6 +19,7 @@ class FrozenWhisper:
         cache_dir: str | Path | None = None,
         device: str = "auto",
         local_files_only: bool = False,
+        num_beams: int = 1,
     ) -> None:
         try:
             import torch
@@ -36,9 +37,12 @@ class FrozenWhisper:
                 device = "cpu"
         if device not in {"cpu", "cuda", "mps"}:
             raise ValueError(f"unsupported device: {device}")
+        if not isinstance(num_beams, int) or isinstance(num_beams, bool) or num_beams <= 0:
+            raise ValueError("num_beams must be a positive integer")
         self.model_id = model_id
         self.model_revision = revision
         self.device = device
+        self.num_beams = num_beams
         self._torch = torch
         load = {
             "cache_dir": str(cache_dir) if cache_dir is not None else None,
@@ -83,7 +87,7 @@ class FrozenWhisper:
             "language": "zh",
             "task": "transcribe",
             "do_sample": False,
-            "num_beams": 1,
+            "num_beams": self.num_beams,
             "max_length": 225,
         }
         if attention_mask is not None:
