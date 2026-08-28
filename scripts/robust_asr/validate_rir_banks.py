@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 
 from robust_asr.acoustics.validation import (
@@ -24,6 +25,12 @@ def arguments() -> argparse.Namespace:
         default=Path("configs/robust_asr/rir.json"),
     )
     parser.add_argument("--skip-file-verification", action="store_true")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=min(32, os.cpu_count() or 1),
+        help="Parallel file hashing/decompression workers (default: up to 32).",
+    )
     return parser.parse_args()
 
 
@@ -41,6 +48,7 @@ def main() -> None:
         test_positions_per_rt60=int(config["test_positions_per_rt60"]),
         fixed_rt60_seconds=tuple(map(float, config["test_rt60_seconds"])),
         verify_files=not args.skip_file_verification,
+        workers=args.workers,
     )
     write_validation_atomic(
         root / "rir" / "pyroom_v1" / "validation.json",

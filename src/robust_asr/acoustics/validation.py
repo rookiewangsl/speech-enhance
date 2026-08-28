@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -67,6 +69,7 @@ def _validate_rows(
     expected_rooms: int,
     expected_rt60: Sequence[float] | None,
     verify_files: bool,
+    workers: int,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     manifest_path = root / f"{split}.jsonl"
     audit_path = root / f"{split}.audit.json"
@@ -111,8 +114,16 @@ def _validate_rows(
         scene = row.get("scene")
         if not isinstance(scene, Mapping):
             raise ValueError(f"missing scene geometry: {row['rir_id']}")
-        if verify_files:
-            _validate_array_file(root, row)
+    if verify_files:
+        validate_file = partial(_validate_array_file, root)
+        if workers == 1:
+            for row in rows:
+                validate_file(row)
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                # Consume map in manifest order so the first reported failure is
+                # deterministic even though hashing/decompression is parallel.
+                tuple(executor.map(validate_file, rows))
 
     declared_paths = {_safe_path(root, row["path"]) for row in rows}
     actual_paths = set((root / split).glob("*.npz"))
@@ -168,9 +179,12 @@ def validate_formal_rir_banks(
     test_positions_per_rt60: int,
     fixed_rt60_seconds: Sequence[float],
     verify_files: bool = True,
+    workers: int = 1,
 ) -> dict[str, Any]:
     """Validate formal train/dev/test banks and return a compact audit."""
 
+    if not isinstance(workers, int) or isinstance(workers, bool) or workers <= 0:
+        raise ValueError("workers must be a positive integer")
     root = Path(bank_root).resolve()
     expected = {
         "train": (
@@ -199,6 +213,7 @@ def validate_formal_rir_banks(
             expected_rooms=rooms,
             expected_rt60=rt60,
             verify_files=verify_files,
+            workers=workers,
         )
         splits[split] = rows
         audits[split] = audit
@@ -214,6 +229,7 @@ def validate_formal_rir_banks(
         "schema_version": 1,
         "status": "PASS",
         "verify_files": verify_files,
+        "workers": workers,
         "bank_root": str(root),
         "splits": {
             split: {

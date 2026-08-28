@@ -52,7 +52,7 @@ def _banks(tmp_path: Path, monkeypatch) -> None:
     )
 
 
-def _validate(tmp_path: Path):
+def _validate(tmp_path: Path, *, workers: int = 1):
     return validate_formal_rir_banks(
         tmp_path,
         train_rooms=1,
@@ -62,6 +62,7 @@ def _validate(tmp_path: Path):
         test_rooms=1,
         test_positions_per_rt60=1,
         fixed_rt60_seconds=(0.2, 0.8),
+        workers=workers,
     )
 
 
@@ -86,3 +87,21 @@ def test_validate_formal_rir_banks_rejects_corrupted_file(
 
     with pytest.raises(ValueError, match="SHA-256 mismatch"):
         _validate(tmp_path)
+
+
+def test_validate_formal_rir_banks_parallel_file_checks(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _banks(tmp_path, monkeypatch)
+
+    summary = _validate(tmp_path, workers=4)
+
+    assert summary["status"] == "PASS"
+    assert summary["workers"] == 4
+
+
+def test_validate_formal_rir_banks_rejects_invalid_worker_count(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="workers must be a positive integer"):
+        _validate(tmp_path, workers=0)
