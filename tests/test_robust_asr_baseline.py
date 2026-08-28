@@ -10,6 +10,7 @@ import pytest
 from robust_asr.baseline import (
     BaselineProgress,
     _paired_deltas,
+    _select_rir,
     run_frozen_baseline,
     select_speaker_balanced_count,
 )
@@ -43,6 +44,32 @@ def test_speaker_balanced_count_is_deterministic() -> None:
     second = select_speaker_balanced_count(reversed(rows), limit=2, seed=7)
     assert first == second
     assert len({row["speaker_id"] for row in first}) == 2
+
+
+def test_formal_test_rir_selection_keeps_family_fixed_across_rt60() -> None:
+    rows = [
+        {
+            "rir_id": f"{family}_{rt60}",
+            "rir_family_id": family,
+            "split": "test",
+            "target_rt60_seconds": rt60,
+        }
+        for family in ("family_a", "family_b", "family_c")
+        for rt60 in (0.2, 0.6, 1.0)
+    ]
+
+    selected = [
+        _select_rir(
+            list(reversed(rows)),
+            utterance_id="utterance",
+            rt60_seconds=rt60,
+            seed=2026,
+        )
+        for rt60 in (0.2, 0.6, 1.0)
+    ]
+
+    assert len({row["rir_family_id"] for row in selected}) == 1
+    assert [row["target_rt60_seconds"] for row in selected] == [0.2, 0.6, 1.0]
 
 
 def test_nara_frontends_preserve_mono_length() -> None:

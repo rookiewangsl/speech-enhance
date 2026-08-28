@@ -100,6 +100,32 @@ def _select_rir(
     rt60_seconds: float,
     seed: int,
 ) -> Mapping[str, Any]:
+    splits = {str(row.get("split", "")) for row in rows}
+    if "test" in splits:
+        if splits != {"test"}:
+            raise ValueError("RIR rows cannot mix formal test with another split")
+        family_ids = sorted(
+            {str(row.get("rir_family_id", "")) for row in rows}
+        )
+        if not family_ids or family_ids[0] == "":
+            raise ValueError("formal test RIR rows require family ids")
+        integer = int.from_bytes(
+            _stable_rank(seed, f"{utterance_id}\0test_rir_family")[:8], "big"
+        )
+        family_id = family_ids[integer % len(family_ids)]
+        paired = [
+            row
+            for row in rows
+            if str(row.get("rir_family_id")) == family_id
+            and abs(float(row["target_rt60_seconds"]) - rt60_seconds) < 1e-8
+        ]
+        if len(paired) != 1:
+            raise ValueError(
+                f"test RIR family {family_id} does not contain exactly one "
+                f"RT60={rt60_seconds} row"
+            )
+        return paired[0]
+
     candidates = [
         row
         for row in rows
