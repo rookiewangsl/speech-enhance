@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -196,6 +197,7 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
             "console_interval_steps",
             "structured_interval_steps",
             "selection_metric",
+            "maximum_clean_cer_degradation_pp",
             "heavy_rt60_seconds",
         },
         context="lora.logging",
@@ -210,6 +212,13 @@ def load_and_validate_protocol(config_directory: str | Path) -> ProtocolSummary:
         raise ValueError("structured logs cannot be less frequent than console output")
     if logging["selection_metric"] != "dev_reverb_cer":
         raise ValueError("checkpoint selection metric must be dev_reverb_cer")
+    maximum_clean_degradation = float(
+        logging["maximum_clean_cer_degradation_pp"]
+    )
+    if maximum_clean_degradation < 0 or not math.isfinite(
+        maximum_clean_degradation
+    ):
+        raise ValueError("maximum clean CER degradation must be finite and non-negative")
     expected_wpe_taps = {"s_wpe_10": 10, "s_wpe_40": 40, "m_wpe_10": 10}
     if wpe.get("taps") != expected_wpe_taps:
         raise ValueError("WPE tap conditions disagree with the frozen protocol")

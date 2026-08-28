@@ -20,12 +20,20 @@ from robust_asr.training.reporting import (
     TrainingProgress,
     TrainingReporter,
 )
+from robust_asr.training.selection import (
+    CheckpointDecision,
+    CheckpointSelector,
+    DevCheckpointMetrics,
+)
 
 __all__ = [
     "BenchmarkConfig",
     "BenchmarkResult",
+    "CheckpointDecision",
+    "CheckpointSelector",
     "ConsoleTrainingReporter",
     "EvaluationSummary",
+    "DevCheckpointMetrics",
     "RunOverview",
     "StructuredTrainingLogger",
     "TrainingCompletion",

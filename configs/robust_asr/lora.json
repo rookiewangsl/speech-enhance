@@ -29,6 +29,7 @@
     "console_interval_steps": 20,
     "structured_interval_steps": 10,
     "selection_metric": "dev_reverb_cer",
+    "maximum_clean_cer_degradation_pp": 0.5,
     "heavy_rt60_seconds": [0.8, 1.0]
   }
 }
