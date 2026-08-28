@@ -30,6 +30,9 @@ evaluation = [
     "matplotlib>=3.9",
     "pystoi>=0.4",
 ]
+paraformer = [
+    "funasr==1.4.5",
+]
 dev = [
     "pytest>=8.0",
 ]

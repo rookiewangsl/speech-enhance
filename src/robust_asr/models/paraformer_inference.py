@@ -58,7 +58,7 @@ class FrozenParaformer:
             from funasr import AutoModel
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError(
-                "frozen Paraformer requires torch, torchaudio and funasr"
+                "frozen Paraformer requires torch and funasr"
             ) from exc
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
