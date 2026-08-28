@@ -29,6 +29,8 @@
   M-WPE-10 没有收益且存在插入错误风险，因此只作为已知混响条件的实验前端。
 - 已完成 greedy/beam 解码对照：Beam-5 改善 clean 子集绝对 CER，但不改变 M-WPE 的收益方向；
   为保持全矩阵可比性，主实验继续统一 greedy，Beam-5 只作最佳模型的可选二级结果。
+- 已完成 500 条×5档×4前端的 direct-target SI-SDR/STOI 审计；M-WPE 的信号与 CER 收益总体
+  同向，但单通道 WPE 存在“信号指标改善、CER 恶化”，证明前端必须按下游指标选择。
 - 已生成严格嵌套的 5/10/20 小时训练 manifest，并完成正式 dev evaluator、可恢复训练 CLI 与
   clean CER 安全门；W0 `dev_model` 冻结基线正在运行。尚未执行 LoRA 训练和封存 test 评测。
 

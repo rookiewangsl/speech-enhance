@@ -29,6 +29,7 @@ CLI 已完成；W0 `dev_model` 基线正在运行，LoRA 训练与 test 消融�
 - Linux RTX 4070 上的本地权重加载、真实语音 GPU 推理与 LoRA forward/backward 验收；
 - 500 条开发集上的 Clean+Raw 五档 RT60 正式基线、成对置信区间与条件化 DRR 分析；
 - 500 条开发集上的三种 WPE 正式消融，以及 clean/direct-only 六条件前端安全边界审计；
+- 500 条×五档 RT60×四前端的 direct-target SI-SDR/STOI 审计与 CER 对照；
 - Clean/MCT 训练 Dataset、epoch 级确定性 train RIR 采样、文件校验与 Whisper batch collator；
 - 正式 test RIR 的同几何 family 跨 RT60 配对生成逻辑、300 组 bank 及结构审计；
 - 可恢复 LoRA 优化循环、多核数据预取、结构化日志和 clean CER 安全门 checkpoint 选择；
