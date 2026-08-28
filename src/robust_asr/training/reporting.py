@@ -98,6 +98,40 @@ def _append_jsonl(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
         os.fsync(stream.fileno())
 
 
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        if not line.strip():
+            continue
+        value = json.loads(line)
+        if not isinstance(value, dict):
+            raise ValueError(f"structured log row {line_number} is not an object")
+        rows.append(value)
+    return rows
+
+
+def _write_jsonl_atomic(path: Path, rows: Iterable[Mapping[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            for row in rows:
+                stream.write(_serialized_json(row, pretty=False))
+                stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        if os.path.exists(temporary_name):
+            os.unlink(temporary_name)
+
+
 def _duration(seconds: float) -> str:
     rounded = max(0, round(seconds))
     hours, remainder = divmod(rounded, 3600)
@@ -348,6 +382,18 @@ class StructuredTrainingLogger:
     def __init__(self, output_dir: str | Path) -> None:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._progress_keys = {
+            (int(row["epoch"]), int(row["step"]))
+            for row in _read_jsonl(self.output_dir / "train_metrics.jsonl")
+        }
+        self._evaluation_epochs = {
+            int(row["epoch"])
+            for row in _read_jsonl(self.output_dir / "eval_metrics.jsonl")
+        }
+        self._prediction_epochs = {
+            int(row["epoch"])
+            for row in _read_jsonl(self.output_dir / "predictions.jsonl")
+        }
 
     def start(
         self,
@@ -362,11 +408,32 @@ class StructuredTrainingLogger:
 
     def progress(self, value: TrainingProgress) -> None:
         row = {"recorded_at_utc": _utc_now(), **asdict(value)}
-        _append_jsonl(self.output_dir / "train_metrics.jsonl", (row,))
+        path = self.output_dir / "train_metrics.jsonl"
+        key = (value.epoch, value.step)
+        if key in self._progress_keys:
+            existing = [
+                previous
+                for previous in _read_jsonl(path)
+                if (int(previous["epoch"]), int(previous["step"])) != key
+            ]
+            _write_jsonl_atomic(path, (*existing, row))
+        else:
+            _append_jsonl(path, (row,))
+            self._progress_keys.add(key)
 
     def evaluation(self, value: EvaluationSummary) -> None:
         row = {"recorded_at_utc": _utc_now(), **asdict(value)}
-        _append_jsonl(self.output_dir / "eval_metrics.jsonl", (row,))
+        metrics_path = self.output_dir / "eval_metrics.jsonl"
+        if value.epoch in self._evaluation_epochs:
+            existing = [
+                previous
+                for previous in _read_jsonl(metrics_path)
+                if int(previous["epoch"]) != value.epoch
+            ]
+            _write_jsonl_atomic(metrics_path, (*existing, row))
+        else:
+            _append_jsonl(metrics_path, (row,))
+            self._evaluation_epochs.add(value.epoch)
 
         path = self.output_dir / "eval_by_rt60.json"
         if path.exists():
@@ -383,11 +450,21 @@ class StructuredTrainingLogger:
     ) -> None:
         _positive_int(epoch, name="epoch")
         recorded_at = _utc_now()
-        enriched = (
+        enriched = tuple(
             {**dict(row), "recorded_at_utc": recorded_at, "epoch": epoch}
             for row in rows
         )
-        _append_jsonl(self.output_dir / "predictions.jsonl", enriched)
+        path = self.output_dir / "predictions.jsonl"
+        if epoch in self._prediction_epochs:
+            existing = [
+                previous
+                for previous in _read_jsonl(path)
+                if int(previous["epoch"]) != epoch
+            ]
+            _write_jsonl_atomic(path, (*existing, *enriched))
+        else:
+            _append_jsonl(path, enriched)
+            self._prediction_epochs.add(epoch)
 
     def warning(
         self,

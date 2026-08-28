@@ -17,6 +17,14 @@ from robust_asr.training.reporting import (
 )
 
 
+def _jsonl(path: Path) -> list[dict]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
 def overview(output_dir: Path) -> RunOverview:
     return RunOverview(
         experiment_id="mct_encoder_qv_seed2026",
@@ -169,6 +177,32 @@ def test_resume_rejects_changed_identity_metadata(tmp_path: Path) -> None:
             environment={"torch": "test"},
             data_audit={"manifest_sha256": "one"},
         )
+
+
+def test_resume_replaces_duplicate_epoch_records(tmp_path: Path) -> None:
+    first = StructuredTrainingLogger(tmp_path)
+    first.progress(progress(10))
+    first.evaluation(evaluation(tmp_path))
+    first.predictions(
+        epoch=1,
+        rows=({"utterance_id": "u1", "hypothesis": "旧"},),
+    )
+
+    resumed = StructuredTrainingLogger(tmp_path)
+    resumed.progress(progress(10))
+    resumed.evaluation(evaluation(tmp_path))
+    resumed.predictions(
+        epoch=1,
+        rows=({"utterance_id": "u1", "hypothesis": "新"},),
+    )
+
+    train_rows = _jsonl(tmp_path / "train_metrics.jsonl")
+    eval_rows = _jsonl(tmp_path / "eval_metrics.jsonl")
+    prediction_rows = _jsonl(tmp_path / "predictions.jsonl")
+    assert len(train_rows) == 1
+    assert len(eval_rows) == 1
+    assert len(prediction_rows) == 1
+    assert prediction_rows[0]["hypothesis"] == "新"
 
 
 def test_non_finite_training_metric_is_rejected() -> None:
