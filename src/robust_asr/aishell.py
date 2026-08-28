@@ -314,6 +314,29 @@ def _as_clean_utterance(row: Mapping[str, Any]) -> CleanUtterance:
     )
 
 
+def derive_duration_subset_rows(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    target_hours: float,
+    seed: int = 2026,
+) -> list[dict[str, Any]]:
+    """Derive a nested duration subset from an already audited train manifest."""
+
+    sources = [dict(row) for row in rows]
+    if not sources:
+        raise ValueError("source train manifest is empty")
+    identifiers = [str(row.get("utterance_id", "")) for row in sources]
+    if any(not value for value in identifiers) or len(set(identifiers)) != len(sources):
+        raise ValueError("source train manifest has empty or duplicate utterance ids")
+    lookup = {str(row["utterance_id"]): row for row in sources}
+    selected = select_speaker_balanced_duration_subset(
+        (_as_clean_utterance(row) for row in sources),
+        target_hours=target_hours,
+        seed=seed,
+    )
+    return [lookup[row.utterance_id] for row in selected]
+
+
 def prepare_manifests(
     corpus_root: str | Path,
     output_root: str | Path,
@@ -379,13 +402,11 @@ def prepare_manifests(
             f"audio_without_transcript={audio_without_transcript[:5]}, "
             f"transcript_without_audio={transcript_without_audio[:5]}"
         )
-    train_subset = select_speaker_balanced_duration_subset(
-        (_as_clean_utterance(row) for row in split_rows["train"]),
+    subset_rows = derive_duration_subset_rows(
+        split_rows["train"],
         target_hours=train_subset_hours,
         seed=seed,
     )
-    lookup = {row["utterance_id"]: row for row in split_rows["train"]}
-    subset_rows = [lookup[row.utterance_id] for row in train_subset]
 
     dev_model = select_speaker_balanced_count_subset(
         (_as_clean_utterance(row) for row in split_rows["dev"]),

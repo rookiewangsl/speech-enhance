@@ -11,6 +11,7 @@ import soundfile as sf
 
 from robust_asr.aishell import (
     build_split_manifest,
+    derive_duration_subset_rows,
     extract_nested_wav_archives,
     extract_tar_safely,
     prepare_manifests,
@@ -256,3 +257,30 @@ def test_external_layout_and_download_receipt(tmp_path: Path) -> None:
         (root / "downloads" / "sample.bin.receipt.json").read_text()
     )
     assert stored["bytes"] == 3
+
+
+def test_derived_duration_subsets_are_deterministic_and_nested() -> None:
+    rows = [
+        {
+            "utterance_id": f"{speaker}_{index}",
+            "speaker_id": speaker,
+            "audio_path": f"{speaker}_{index}.wav",
+            "transcript": "测试",
+            "duration_seconds": 10.0,
+        }
+        for speaker in ("s1", "s2", "s3")
+        for index in range(6)
+    ]
+
+    small = derive_duration_subset_rows(
+        reversed(rows), target_hours=60 / 3600, seed=7
+    )
+    large = derive_duration_subset_rows(
+        rows, target_hours=120 / 3600, seed=7
+    )
+
+    assert len(small) == 6
+    assert len(large) == 12
+    assert {row["utterance_id"] for row in small} < {
+        row["utterance_id"] for row in large
+    }
