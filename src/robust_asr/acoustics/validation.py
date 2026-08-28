@@ -235,9 +235,22 @@ def validate_formal_rir_banks(
             split: {
                 "rirs": len(rows),
                 "rooms": len({row["room_id"] for row in rows}),
-                "geometry_families": int(audits[split]["geometry_families"]),
+                "geometry_families": int(
+                    audits[split].get(
+                        "geometry_families",
+                        len(
+                            {
+                                row.get("rir_family_id", row["geometry_id"])
+                                for row in rows
+                            }
+                        ),
+                    )
+                ),
                 "paired_rt60_geometry": bool(
-                    audits[split]["paired_rt60_geometry"]
+                    audits[split].get(
+                        "paired_rt60_geometry",
+                        split == "test",
+                    )
                 ),
                 "manifest_sha256": audits[split]["manifest_sha256"],
             }

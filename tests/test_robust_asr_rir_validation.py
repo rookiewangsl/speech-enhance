@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -105,3 +106,19 @@ def test_validate_formal_rir_banks_rejects_invalid_worker_count(
 ) -> None:
     with pytest.raises(ValueError, match="workers must be a positive integer"):
         _validate(tmp_path, workers=0)
+
+
+def test_validate_formal_rir_banks_supports_legacy_dev_audit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _banks(tmp_path, monkeypatch)
+    audit_path = tmp_path / "dev.audit.json"
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    audit.pop("geometry_families")
+    audit.pop("paired_rt60_geometry")
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+
+    summary = _validate(tmp_path, workers=2)
+
+    assert summary["splits"]["dev"]["geometry_families"] == 2
+    assert summary["splits"]["dev"]["paired_rt60_geometry"] is False
