@@ -119,4 +119,21 @@ def test_interaction_summary_builds_three_model_paired_matrix() -> None:
     assert summary["models"]["w0_pretrained"]["robust"]["raw_cer"] == 0.30
     assert summary["models"]["w2_mct_lora"]["robust"]["m_wpe_10_cer"] == 0.11
     assert summary["wpe_model_interactions"]["w2_mct_lora"]["value"] > 0
+    assert summary["evaluation_split"] == "dev"
     assert summary["test_split_accessed"] is False
+
+
+def test_interaction_summary_marks_test_access() -> None:
+    module = _module()
+    rows = {
+        "w0_pretrained": _rows(raw_errors=30, enhanced_errors=15, revision="w0"),
+        "w1_clean_lora": _rows(
+            raw_errors=20, enhanced_errors=12, revision="clean"
+        ),
+        "w2_mct_lora": _rows(raw_errors=18, enhanced_errors=11, revision="mct"),
+    }
+
+    summary = module.build_summary(rows, draws=100, seed=7, split="test")
+
+    assert summary["evaluation_split"] == "test"
+    assert summary["test_split_accessed"] is True

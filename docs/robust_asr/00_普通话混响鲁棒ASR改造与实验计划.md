@@ -1,9 +1,9 @@
 # 普通话混响鲁棒 ASR：项目改造与实验计划
 
-最后更新：2026-08-28
-状态：方案 v0.4；AISHELL-1、开发集 RIR、Linux GPU 环境、LoRA 反向链路、正式 Raw/WPE 开发集
-基线和无反射前端审计已经验收。正式 train/dev/test RIR、可恢复优化循环、dev evaluator 和训练
-CLI 已完成；W0 `dev_model` 基线正在运行，LoRA 训练与 test 消融尚未执行。除
+最后更新：2026-08-29
+状态：方案 v0.5；数据/RIR/WPE 开发集消融、LoRA 位置消融、Clean/MCT 正式训练及
+`W0/Clean/MCT × Raw/M-WPE` 开发集交互实验已经完成。最终测试协议已按开发集结果锁定，test 推理尚未
+开始。除
 [执行记录](01_执行记录与复现.md)明确列出的结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
@@ -18,7 +18,8 @@ CLI 已完成；W0 `dev_model` 基线正在运行，LoRA 训练与 test 消融�
 - 四麦 UCA 房间几何采样、RT60 容差、DRR、完整卷积、共同增益和削波保护；
 - offline WPE 的 NumPy reference smoke 后端及 NARA-WPE 正式后端接口；
 - Whisper LoRA 精确目标层筛选、参数计数检查和 4070 训练预算回退逻辑；
-- 3 模型 × 4 前端 × 5 RT60 的 60-cell/60,000-input 正式矩阵生成；
+- 3 模型 × 4 候选前端 × 5 RT60 的开发候选矩阵生成；开发集选定 M-WPE-10 后，最终 test 冻结为
+  3 模型 × 2 前端 × 5 RT60 的 30-cell/30,000-input 混响矩阵；
 - 协议校验、矩阵导出和合成四通道 WPE 单元测试；
 - AISHELL-1 主包与资源包 SHA 校验、400 个 speaker 压缩包安全解包、141,925 WAV 全量审计；
 - 120,098 条训练、14,326 条开发、7,176 条测试可用清单；325 条无官方转写 WAV 均有审计记录且
@@ -48,9 +49,8 @@ CLI 已完成；W0 `dev_model` 基线正在运行，LoRA 训练与 test 消融�
 ./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：完成正在运行的 W0 `dev_model` 基线；在用户允许训练后执行 100-step 算力闸门、LoRA
-位置短程消融、Clean/MCT 正式训练和 test 推理。Linux + RTX 4070 环境统一安装
-`.[asr,train,evaluation,dev]`。
+仍待执行：按 `configs/robust_asr/final_test.json` 一次性运行正式 test 推理、汇总配对统计并更新
+项目总结。测试开始后不允许根据 test 结果调整 WPE、checkpoint、LoRA 或样本集合。
 
 ## 1. 项目定位
 
@@ -627,7 +627,7 @@ run 目录中的配置、环境或数据审计与本次启动不一致，则拒�
 
 rank、dropout、学习率不做完整网格；它们只在训练失败时进入诊断，不作为简历主消融。
 
-### 11.4 阶段 D：最终全因子矩阵
+### 11.4 阶段 D：最终冻结矩阵
 
 模型：
 
@@ -637,14 +637,15 @@ W1 Clean-LoRA
 W2 MCT-LoRA
 ```
 
-仿真测试对每个模型运行：
+四前端属于开发集候选集合。开发集结果已选定 M-WPE-10，S-WPE-10/40 不再进入 test；这项收敛发生
+在读取 test 之前。仿真测试对每个模型运行：
 
 ```text
 1,000 utterances
 × 5 RT60
-× 4 frontends (Raw/S10/S40/M10)
-= 20,000 ASR inputs/model
-= 60,000 inputs total
+× 2 frontends (Raw/M10)
+= 10,000 reverb ASR inputs/model
+= 30,000 reverb inputs total
 ```
 
 核心汇总表：
@@ -652,11 +653,18 @@ W2 MCT-LoRA
 | Model | Frontend | Clean | RT60 0.2 | 0.4 | 0.6 | 0.8 | 1.0 | Robust mean |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | W0 | Raw | CER | CER | CER | CER | CER | CER | CER |
-| W0 | S-WPE-10 | — | CER | CER | CER | CER | CER | CER |
-| W0 | S-WPE-40 | — | CER | CER | CER | CER | CER | CER |
 | W0 | M-WPE-10 | — | CER | CER | CER | CER | CER | CER |
 | W1 | ... | ... | ... | ... | ... | ... | ... | ... |
 | W2 | ... | ... | ... | ... | ... | ... | ... | ... |
+
+正式锁文件为 `configs/robust_asr/final_test.json`。锁定身份包括：
+
+- `aishell1_test_reverb.jsonl`：1,000 条，SHA-256
+  `d3689b02b91b6ad39d996cd45cff438cc722c0006eb8caed759e240ed23d9743`；
+- test RIR：20 rooms、60 个同几何 family、300 组，manifest SHA-256
+  `a871a0456c2c3ab7bc1c2afe5238cd5b1821f982fb2d9259da21249f801d6c03`；
+- Clean/MCT adapter 均固定 epoch 3，并锁定 `adapter_model.safetensors` 文件 SHA-256；
+- seed `2026`、10,000 次 paired bootstrap、五档 RT60、greedy 解码和 M-WPE-10 参数全部不变。
 
 ### 11.5 WPE 与 LoRA 互补性
 

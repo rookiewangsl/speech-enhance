@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize the W0/Clean/MCT × Raw/M-WPE paired dev interaction."""
+"""Summarize the W0/Clean/MCT × Raw/M-WPE paired interaction."""
 
 from __future__ import annotations
 
@@ -22,18 +22,28 @@ from robust_asr.scoring import (
 
 ROBUST_RT60 = (0.4, 0.6, 0.8, 1.0)
 HEAVY_RT60 = (0.8, 1.0)
-MODEL_FILES = {
-    "w0_pretrained": "w0_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
-    "w1_clean_lora": "clean_lora_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
-    "w2_mct_lora": "mct_lora_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
+MODEL_FILES_BY_SPLIT = {
+    "dev": {
+        "w0_pretrained": "w0_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
+        "w1_clean_lora": "clean_lora_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
+        "w2_mct_lora": "mct_lora_whisper_dev_model_dev_1000utt_raw_mwpe_v1.jsonl",
+    },
+    "test": {
+        "w0_pretrained": "w0_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl",
+        "w1_clean_lora": "clean_lora_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl",
+        "w2_mct_lora": "mct_lora_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl",
+    },
 }
+MODEL_NAMES = frozenset(MODEL_FILES_BY_SPLIT["dev"])
 
 
 def arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-root", type=Path)
+    parser.add_argument("--split", choices=("dev", "test"), default="dev")
     parser.add_argument(
-        "--output-name", default="lora_wpe_interaction_dev_1000utt_v1.json"
+        "--output-name",
+        help="Defaults to lora_wpe_interaction_<split>_1000utt_v1.json.",
     )
     parser.add_argument("--bootstrap-draws", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=2026)
@@ -136,8 +146,11 @@ def build_summary(
     *,
     draws: int = 10_000,
     seed: int = 2026,
+    split: str = "dev",
 ) -> dict[str, Any]:
-    if set(model_rows) != set(MODEL_FILES):
+    if split not in MODEL_FILES_BY_SPLIT:
+        raise ValueError(f"unsupported split: {split}")
+    if set(model_rows) != MODEL_NAMES:
         raise ValueError("summary requires W0, Clean-LoRA, and MCT-LoRA")
     models = {
         name: _model_summary(rows, draws=draws, seed=seed)
@@ -206,25 +219,30 @@ def build_summary(
         "models": models,
         "wpe_model_interactions": interactions,
         "mct_minus_clean": model_deltas,
-        "test_split_accessed": False,
+        "evaluation_split": split,
+        "test_split_accessed": split == "test",
     }
 
 
 def main() -> None:
     args = arguments()
-    if Path(args.output_name).name != args.output_name:
+    output_name = args.output_name or (
+        f"lora_wpe_interaction_{args.split}_1000utt_v1.json"
+    )
+    if Path(output_name).name != output_name:
         raise ValueError("--output-name must be a basename")
     root = require_data_root(args.data_root)
     model_rows = {
         name: read_jsonl(root / "outputs" / filename)
-        for name, filename in MODEL_FILES.items()
+        for name, filename in MODEL_FILES_BY_SPLIT[args.split].items()
     }
     summary = build_summary(
         model_rows,
         draws=args.bootstrap_draws,
         seed=args.seed,
+        split=args.split,
     )
-    output_path = root / "outputs" / args.output_name
+    output_path = root / "outputs" / output_name
     temporary = output_path.with_suffix(output_path.suffix + ".tmp")
     temporary.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

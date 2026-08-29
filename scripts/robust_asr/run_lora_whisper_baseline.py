@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extend one trained Whisper LoRA dev result with fixed WPE inference."""
+"""Evaluate one trained Whisper LoRA adapter with fixed WPE inference."""
 
 from __future__ import annotations
 
@@ -35,6 +35,16 @@ def arguments() -> argparse.Namespace:
         "--rt60", type=float, nargs="+", default=(0.2, 0.4, 0.6, 0.8, 1.0)
     )
     parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument(
+        "--manifest-name",
+        default="aishell1_dev_model.jsonl",
+        help="JSONL name under manifests/aishell1.",
+    )
+    parser.add_argument(
+        "--rir-split",
+        choices=("dev", "test"),
+        default="dev",
+    )
     parser.add_argument("--bootstrap-draws", type=int, default=10_000)
     parser.add_argument("--checkpoint-every", type=int, default=20)
     parser.add_argument("--progress-every", type=int, default=20)
@@ -141,11 +151,11 @@ def main() -> None:
             expected_model_revision=transcriber.model_revision,
         )
     summary = run_frozen_baseline(
-        manifest_path=(
-            root / "manifests" / "aishell1" / "aishell1_dev_model.jsonl"
-        ),
+        manifest_path=root / "manifests" / "aishell1" / args.manifest_name,
         corpus_root=root / "corpora" / "aishell1",
-        rir_manifest_path=root / "rir" / "pyroom_v1" / "dev.jsonl",
+        rir_manifest_path=(
+            root / "rir" / "pyroom_v1" / f"{args.rir_split}.jsonl"
+        ),
         rir_root=root / "rir" / "pyroom_v1",
         output_path=output_path,
         transcriber=transcriber,

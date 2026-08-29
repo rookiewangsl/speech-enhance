@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "locked_at": "2026-08-29",
+  "selection_basis": "development_splits_only",
+  "manifest": {
+    "name": "aishell1_test_reverb.jsonl",
+    "utterances": 1000,
+    "sha256": "d3689b02b91b6ad39d996cd45cff438cc722c0006eb8caed759e240ed23d9743"
+  },
+  "rir": {
+    "split": "test",
+    "rooms": 20,
+    "geometry_families": 60,
+    "rirs": 300,
+    "paired_rt60_geometry": true,
+    "manifest_sha256": "a871a0456c2c3ab7bc1c2afe5238cd5b1821f982fb2d9259da21249f801d6c03"
+  },
+  "models": {
+    "w0_pretrained": {
+      "adapter": null,
+      "adapter_model_sha256": null,
+      "output": "w0_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl"
+    },
+    "w1_clean_lora": {
+      "adapter": "runs/formal_clean_lora_20h_encoder_decoder_qv_v1/checkpoints/epoch_003",
+      "adapter_model_sha256": "1ad393b7057108360ed9c6348c3a00f32c2dec66dbac42146bc304ae71749332",
+      "output": "clean_lora_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl"
+    },
+    "w2_mct_lora": {
+      "adapter": "runs/formal_mct_lora_20h_encoder_decoder_qv_v1/checkpoints/epoch_003",
+      "adapter_model_sha256": "4f3e47025ebb3c42a6d975d44ca2373fbf6a7ece9f2babcded576e839b207690",
+      "output": "mct_lora_whisper_test_reverb_test_1000utt_raw_mwpe_v1.jsonl"
+    }
+  },
+  "frontends": ["raw", "m_wpe_10"],
+  "rt60_seconds": [0.2, 0.4, 0.6, 0.8, 1.0],
+  "seed": 2026,
+  "bootstrap_draws": 10000,
+  "summary_output": "lora_wpe_interaction_test_1000utt_v1.json",
+  "test_time_tuning_allowed": false
+}
