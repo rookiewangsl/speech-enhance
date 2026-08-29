@@ -173,16 +173,14 @@ def _plot_spectrograms(
         for signal in (example.clean_timeline, example.raw, example.m_wpe)
     )
     prepared: dict[tuple[int, str], tuple[np.ndarray, ...]] = {}
-    magnitudes: list[np.ndarray] = []
     for row_index, example in enumerate(examples):
         for field, _ in columns:
             signal = np.asarray(getattr(example, field), dtype=np.float64)
             padded = np.pad(signal, (0, longest - signal.size))
             values = _spectrogram(padded, sample_rate)
             prepared[(row_index, field)] = values
-            magnitudes.append(values[2].ravel())
-    color_max = float(np.quantile(np.concatenate(magnitudes), 0.997))
-    color_min = color_max - 60.0
+    color_min = -100.0
+    color_max = -25.0
 
     plt.rcParams.update(
         {
@@ -229,7 +227,13 @@ def _plot_spectrograms(
                 axis.set_xlabel("Time (s)")
     if image is None:
         raise RuntimeError("no spectrograms were rendered")
-    colorbar = figure.colorbar(image, ax=axes, shrink=0.92, pad=0.01)
+    colorbar = figure.colorbar(
+        image,
+        ax=axes,
+        shrink=0.92,
+        pad=0.01,
+        ticks=(-100, -85, -70, -55, -40, -25),
+    )
     colorbar.set_label("STFT magnitude (dB, shared scale)")
     figure.suptitle(
         f"Controlled Reverberation Example | {utterance['utterance_id']} | "
