@@ -324,7 +324,7 @@ def _plot_band_envelopes(
             envelope_db = 20.0 * np.log10(
                 np.maximum(
                     prepared[(row_index, field)] / reference,
-                    1e-5,
+                    1e-7,
                 )
             )
             axes[row_index, 0].plot(
@@ -352,7 +352,7 @@ def _plot_band_envelopes(
                 linewidth=1.0,
             )
             axis.grid(alpha=0.2)
-            axis.set_ylim(-80.0, 3.0)
+            axis.set_ylim(-120.0, 3.0)
         axes[row_index, 0].set_ylabel(
             f"RT60 {example.target_rt60:.1f} s\n"
             f"DRR {example.drr_db:+.1f} dB\nEnvelope (dB)"
