@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 import soundfile as sf
-from scipy.signal import stft
+from scipy.signal import butter, hilbert, sosfiltfilt, stft
 
 from robust_asr.acoustics.rir import convolve_multichannel
 from robust_asr.dereverb.frontend import apply_frontend
@@ -39,7 +39,10 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--rir-family-id", default="test_r000_f000")
     parser.add_argument("--rt60", type=float, nargs="+", default=(0.2, 0.6, 1.0))
     parser.add_argument("--spectrogram-output", type=Path, required=True)
+    parser.add_argument("--band-envelope-output", type=Path, required=True)
     parser.add_argument("--rir-output", type=Path, required=True)
+    parser.add_argument("--band-low-hz", type=float, default=300.0)
+    parser.add_argument("--band-high-hz", type=float, default=1200.0)
     return parser.parse_args()
 
 
@@ -170,16 +173,16 @@ def _plot_spectrograms(
         for signal in (example.clean_timeline, example.raw, example.m_wpe)
     )
     prepared: dict[tuple[int, str], tuple[np.ndarray, ...]] = {}
-    maxima: list[float] = []
+    magnitudes: list[np.ndarray] = []
     for row_index, example in enumerate(examples):
         for field, _ in columns:
             signal = np.asarray(getattr(example, field), dtype=np.float64)
             padded = np.pad(signal, (0, longest - signal.size))
             values = _spectrogram(padded, sample_rate)
             prepared[(row_index, field)] = values
-            maxima.append(float(np.max(values[2])))
-    color_max = max(maxima)
-    color_min = color_max - 75.0
+            magnitudes.append(values[2].ravel())
+    color_max = float(np.quantile(np.concatenate(magnitudes), 0.997))
+    color_min = color_max - 60.0
 
     plt.rcParams.update(
         {
@@ -209,7 +212,7 @@ def _plot_spectrograms(
                 frequencies / 1000.0,
                 magnitude_db,
                 shading="auto",
-                cmap="magma",
+                cmap="jet",
                 vmin=color_min,
                 vmax=color_max,
             )
@@ -232,6 +235,133 @@ def _plot_spectrograms(
         f"Controlled Reverberation Example | {utterance['utterance_id']} | "
         f"source {float(utterance['duration_seconds']):.2f} s\n"
         "Dashed line: clean source end; energy to the right is the reverberant tail"
+    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=200, format="png")
+    plt.close(figure)
+
+
+def _band_envelope(
+    signal: np.ndarray,
+    *,
+    sample_rate: int,
+    low_hz: float,
+    high_hz: float,
+) -> np.ndarray:
+    if not 0.0 < low_hz < high_hz < sample_rate / 2:
+        raise ValueError("band limits must satisfy 0 < low < high < Nyquist")
+    sos = butter(
+        4,
+        (low_hz, high_hz),
+        btype="bandpass",
+        fs=sample_rate,
+        output="sos",
+    )
+    filtered = sosfiltfilt(sos, np.asarray(signal, dtype=np.float64))
+    envelope = np.abs(hilbert(filtered))
+    window = max(1, round(0.02 * sample_rate))
+    return np.convolve(envelope, np.ones(window) / window, mode="same")
+
+
+def _plot_band_envelopes(
+    *,
+    utterance: dict[str, Any],
+    examples: list[Example],
+    sample_rate: int,
+    low_hz: float,
+    high_hz: float,
+    output: Path,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fields = (
+        ("clean_timeline", "Clean", "#4b5563", "--"),
+        ("raw", "Raw reverberant", "#dc2626", "-"),
+        ("m_wpe", "M-WPE-10", "#047857", "-"),
+    )
+    prepared: dict[tuple[int, str], np.ndarray] = {}
+    reference = 0.0
+    longest = max(
+        signal.size
+        for example in examples
+        for signal in (example.clean_timeline, example.raw, example.m_wpe)
+    )
+    for row_index, example in enumerate(examples):
+        for field, _, _, _ in fields:
+            signal = np.asarray(getattr(example, field), dtype=np.float64)
+            padded = np.pad(signal, (0, longest - signal.size))
+            envelope = _band_envelope(
+                padded,
+                sample_rate=sample_rate,
+                low_hz=low_hz,
+                high_hz=high_hz,
+            )
+            prepared[(row_index, field)] = envelope
+            reference = max(reference, float(np.max(envelope)))
+    if reference <= np.finfo(float).tiny:
+        raise ValueError("band-limited examples are silent")
+
+    figure, axes = plt.subplots(
+        len(examples),
+        2,
+        figsize=(11.2, 7.5),
+        sharey=True,
+        constrained_layout=True,
+    )
+    full_time = np.arange(longest) / sample_rate
+    for row_index, example in enumerate(examples):
+        source_end = (
+            example.arrival_sample + int(utterance["frames"])
+        ) / sample_rate
+        for field, label, color, linestyle in fields:
+            envelope_db = 20.0 * np.log10(
+                np.maximum(
+                    prepared[(row_index, field)] / reference,
+                    1e-5,
+                )
+            )
+            axes[row_index, 0].plot(
+                full_time,
+                envelope_db,
+                label=label,
+                color=color,
+                linestyle=linestyle,
+                linewidth=1.45,
+            )
+            relative_time = full_time - source_end
+            axes[row_index, 1].plot(
+                relative_time,
+                envelope_db,
+                label=label,
+                color=color,
+                linestyle=linestyle,
+                linewidth=1.55,
+            )
+        for axis in axes[row_index]:
+            axis.axvline(
+                0.0 if axis is axes[row_index, 1] else source_end,
+                color="#111827",
+                linestyle=":",
+                linewidth=1.0,
+            )
+            axis.grid(alpha=0.2)
+            axis.set_ylim(-80.0, 3.0)
+        axes[row_index, 0].set_ylabel(
+            f"RT60 {example.target_rt60:.1f} s\n"
+            f"DRR {example.drr_db:+.1f} dB\nEnvelope (dB)"
+        )
+        axes[row_index, 1].set_xlim(-0.25, 1.25)
+    axes[0, 0].set_title("Full utterance")
+    axes[0, 1].set_title("Tail zoom around source end")
+    axes[-1, 0].set_xlabel("Time (s)")
+    axes[-1, 1].set_xlabel("Time relative to clean source end (s)")
+    axes[0, 1].legend(frameon=False, ncol=3, fontsize=8.5, loc="lower left")
+    figure.suptitle(
+        f"{low_hz:.0f}-{high_hz:.0f} Hz Band-Limited Temporal Envelope | "
+        "shared amplitude reference"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output, dpi=200, format="png")
@@ -298,7 +428,11 @@ def _plot_rir_decay(
 
 def main() -> None:
     args = arguments()
-    for output in (args.spectrogram_output, args.rir_output):
+    for output in (
+        args.spectrogram_output,
+        args.band_envelope_output,
+        args.rir_output,
+    ):
         if output.suffix.lower() != ".png":
             raise ValueError("documentation figure output must be PNG")
     root = require_data_root(args.data_root)
@@ -314,10 +448,18 @@ def main() -> None:
         sample_rate=sample_rate,
         output=args.spectrogram_output,
     )
+    _plot_band_envelopes(
+        utterance=utterance,
+        examples=examples,
+        sample_rate=sample_rate,
+        low_hz=args.band_low_hz,
+        high_hz=args.band_high_hz,
+        output=args.band_envelope_output,
+    )
     _plot_rir_decay(examples=examples, sample_rate=sample_rate, output=args.rir_output)
     print(
         f"Rendered {utterance['utterance_id']} with {args.rir_family_id}: "
-        f"{args.spectrogram_output}, {args.rir_output}"
+        f"{args.spectrogram_output}, {args.band_envelope_output}, {args.rir_output}"
     )
 
 
