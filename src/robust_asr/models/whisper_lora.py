@@ -7,9 +7,12 @@ are available.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from robust_asr.lora import (
     LoRAProtocol,
@@ -26,6 +29,33 @@ class WhisperLoRAComponents:
     target_module_names: tuple[str, ...]
     trainable_parameters: int
     total_parameters: int
+
+
+@dataclass(frozen=True)
+class WhisperLoRAInferenceComponents:
+    processor: Any
+    model: Any
+    adapter_sha256: str
+    total_parameters: int
+
+
+def lora_parameter_sha256(model: Any) -> str:
+    """Hash all LoRA tensors, including adapters frozen for inference."""
+
+    digest = hashlib.sha256()
+    found = 0
+    for name, parameter in sorted(model.named_parameters()):
+        if "lora_" not in name:
+            continue
+        values = parameter.detach().cpu().contiguous().numpy()
+        digest.update(name.encode("utf-8"))
+        digest.update(str(values.dtype).encode("ascii"))
+        digest.update(np.asarray(values.shape, dtype=np.int64).tobytes())
+        digest.update(values.tobytes())
+        found += 1
+    if found == 0:
+        raise ValueError("model has no LoRA parameters to fingerprint")
+    return digest.hexdigest()
 
 
 def _build_whisper_lora_config(
@@ -126,4 +156,64 @@ def load_whisper_lora_components(
         target_module_names=targets,
         trainable_parameters=trainable,
         total_parameters=total,
+    )
+
+
+def load_whisper_lora_for_inference(
+    *,
+    adapter_path: str | Path,
+    model_id: str = "openai/whisper-small",
+    revision: str = "973afd24965f72e36ca33b3055d56a652f456b4d",
+    cache_dir: str | Path | None = None,
+    device: str = "cuda",
+    local_files_only: bool = False,
+) -> WhisperLoRAInferenceComponents:
+    """Load one saved generic PEFT adapter on the frozen Whisper base model."""
+
+    try:
+        import torch
+        from peft import PeftModel
+        from transformers import WhisperForConditionalGeneration, WhisperProcessor
+    except ImportError as exc:  # pragma: no cover - optional dependency
+        raise RuntimeError(
+            "Whisper LoRA inference requires torch, transformers, and peft"
+        ) from exc
+    adapter = Path(adapter_path)
+    for name in ("adapter_config.json", "adapter_model.safetensors"):
+        if not (adapter / name).is_file():
+            raise FileNotFoundError(adapter / name)
+    if device not in {"cpu", "cuda", "mps"}:
+        raise ValueError(f"unsupported device: {device}")
+    if device == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested but is unavailable")
+    load_kwargs: dict[str, Any] = {
+        "local_files_only": local_files_only,
+        "revision": revision,
+        "cache_dir": str(cache_dir) if cache_dir is not None else None,
+    }
+    processor = WhisperProcessor.from_pretrained(model_id, **load_kwargs)
+    processor.tokenizer.set_prefix_tokens(
+        language="zh",
+        task="transcribe",
+        predict_timestamps=False,
+    )
+    base_model = WhisperForConditionalGeneration.from_pretrained(
+        model_id, **load_kwargs
+    )
+    model = PeftModel.from_pretrained(
+        base_model,
+        adapter,
+        is_trainable=False,
+        local_files_only=local_files_only,
+    )
+    model.generation_config.language = "zh"
+    model.generation_config.task = "transcribe"
+    model.requires_grad_(False)
+    model.eval()
+    model.to(device)
+    return WhisperLoRAInferenceComponents(
+        processor=processor,
+        model=model,
+        adapter_sha256=lora_parameter_sha256(model),
+        total_parameters=sum(parameter.numel() for parameter in model.parameters()),
     )
