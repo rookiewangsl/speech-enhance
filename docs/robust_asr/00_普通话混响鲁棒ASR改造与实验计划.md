@@ -1,18 +1,18 @@
 # 普通话混响鲁棒 ASR：项目改造与实验计划
 
 最后更新：2026-08-29
-状态：方案 v0.5；数据/RIR/WPE 开发集消融、LoRA 位置消融、Clean/MCT 正式训练及
-`W0/Clean/MCT × Raw/M-WPE` 开发集交互实验已经完成。最终测试协议已按开发集结果锁定，test 推理尚未
-开始。除
+状态：方案 v0.7；数据/RIR/WPE 开发集消融、LoRA 位置消融、Clean/MCT 正式训练、
+`W0/Clean/MCT × Raw/M-WPE` 开发集与 1,000 条封存 test 交互实验，以及冻结 Paraformer
+500 条封存 test 跨模型验证均已完成。除
 [执行记录](01_执行记录与复现.md)明确列出的结果外，
 本文中的实验规模和性能数值均为计划，不是已经得到的结果。
 项目结论、简历 bullet 和面试叙事集中维护在[项目总结文档](02_项目结论与简历面试叙事.md)。
 
 ## 0. 当前实施状态
 
-截至 2026-08-28，已完成：
+截至 2026-08-29，已完成：
 
-- `configs/robust_asr/*.json` 六份冻结配置及跨文件 SHA/一致性校验；
+- `configs/robust_asr/*.json` 九份冻结配置及跨文件 SHA/一致性校验；
 - 中文 NFKC/字符过滤 normalizer、CER、S/D/I 和 paired bootstrap；
 - JSONL 原子写入、speaker/room 分组泄漏检查、MCT/RIR 确定性采样；
 - 四麦 UCA 房间几何采样、RT60 容差、DRR、完整卷积、共同增益和削波保护；
@@ -36,6 +36,8 @@
 - 可恢复 LoRA 优化循环、多核数据预取、结构化日志和 clean CER 安全门 checkpoint 选择；
 - 严格嵌套的 5/10/20 小时训练 manifest、正式 dev evaluator 和训练 CLI；
 - train/dev/test 共 1,500 组 RIR 的文件哈希、数组、RT60、inventory 与 room/geometry 隔离联合校验；
+- Whisper 三模型×Raw/M-WPE 的 1,000 条封存 test，共 33,000 条结果及配对交互统计；
+- 冻结 Paraformer 的 500 条封存 test 跨模型复核，共 5,500 条结果及配对区间；
 - 活动代码已收敛为单一 `robust_asr` 包；历史实时增强代码从当前代码树移除。
 
 当前 reference WPE 只用于验证数学接口、shape、缓存和测试，不得作为正式 WPE 结果。正式实验仍
@@ -49,8 +51,9 @@
 ./.venv-robust-asr/bin/python -m pytest
 ```
 
-仍待执行：按 `configs/robust_asr/final_test.json` 一次性运行正式 test 推理、汇总配对统计并更新
-项目总结。测试开始后不允许根据 test 结果调整 WPE、checkpoint、LoRA 或样本集合。
+核心计划已完成。只剩视数据可用性决定是否增加实测 RIR 的 sim-to-real 扩展。
+Whisper 和 Paraformer 正式 test 均已封存，不允许根据 test 结果调整 WPE、checkpoint、
+LoRA 或样本集合。
 
 ## 1. 项目定位
 
@@ -127,7 +130,7 @@ Git 提交 `767413b6df696f2b99aa5e5b1d52769834520b9e` 审计或恢复，但不�
 | 去混响 | offline WPE；Raw、S-WPE-10、S-WPE-40、M-WPE-10 |
 | 训练规模 | 固定 20 小时 AISHELL-1 子集；超时才统一降为 10 小时 |
 | 主要指标 | 中文规范化 CER；信号指标只作解释 |
-| Paraformer | 暂不微调；冻结跨模型验证为可选扩展 |
+| Paraformer | 不微调；已完成冻结跨模型 Raw/M-WPE 封存 test 验证 |
 | AISHELL-4 | 当前不做 |
 | 部署 | 当前不做 |
 
@@ -244,8 +247,9 @@ tests/
 docs/robust_asr/
 ```
 
-优化循环和 checkpoint 选择已经实现并通过本机/Linux 回归测试；正式 dev evaluator、训练 CLI 和
-LoRA 结果绘图尚未实现。详细职责见[代码架构与清理记录](03_代码架构与清理记录.md)。
+优化循环、checkpoint 选择、正式 dev evaluator、训练 CLI、可恢复测试链和最终结果
+PNG 绘图均已实现并通过本机/Linux 验收。详细职责见
+[代码架构与清理记录](03_代码架构与清理记录.md)。
 
 新代码只进入 `robust_asr` 命名空间，不恢复旧项目模块。
 
@@ -896,7 +900,8 @@ WPE 消融 > 实测 RIR > Paraformer。不得为了外部扩展牺牲核心 test
 边界：仿真结论能否迁移到未见实测 RIR，哪些问题尚未覆盖？
 ```
 
-在新结果完成前，不提前写具体 CER 改善数字。历史英文项目只通过 Git 历史审计，不重新并入活动代码树。
+所有简历 CER 数字必须来自已锁定的正式汇总，不使用 smoke 或临时调试数字。
+历史英文项目只通过 Git 历史审计，不重新并入活动代码树。
 
 ## 19. 参考实现与资料
 

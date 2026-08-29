@@ -20,7 +20,8 @@
 - 已实现普通话文本归一化、CER、替换/删除/插入统计和 paired bootstrap。
 - 已验证冻结 Whisper GPU 推理和 LoRA 前向/反向链路。
 - 已完成协议校验、数据泄漏检查和自动测试。
-- 已完成 500 条开发集 Clean+Raw 五档 RT60 基线；Raw CER 从 13.56% 单调上升至 27.36%。
+- 已完成 1,000 条封存 test 的三模型×Raw/M-WPE 正式矩阵，共 33,000 条结果；W0 Raw CER 随
+  RT60 从 14.82% 升至 30.04%，M-WPE 将 Robust CER 从 23.61% 降至 15.39%。
 - 已实现 Clean/MCT 训练 Dataset、epoch 级确定性 RIR 采样、Whisper batch collator、可恢复
   优化循环和带 clean CER 安全门的 checkpoint 选择。
 - 已完成正式 WPE 开发集消融；M-WPE-10 在五档 RT60 均取得最低 CER，且在
@@ -31,10 +32,11 @@
   为保持全矩阵可比性，主实验继续统一 greedy，Beam-5 只作最佳模型的可选二级结果。
 - 已完成 500 条×5档×4前端的 direct-target SI-SDR/STOI 审计；M-WPE 的信号与 CER 收益总体
   同向，但单通道 WPE 存在“信号指标改善、CER 恶化”，证明前端必须按下游指标选择。
-- 已生成严格嵌套的 5/10/20 小时训练 manifest，并完成正式 dev evaluator、可恢复训练 CLI 与
-  clean CER 安全门；W0 `dev_model` 冻结基线正在运行。尚未执行 LoRA 训练和封存 test 评测。
-- 已冻结经典离线 Paraformer `v2.0.4` 权重及 SHA-256，并在共享 ASR 环境完成 GPU
-  冒烟验证；跨模型实验仅比较 Raw 与 M-WPE，不引入 VAD、标点、语言模型或热词。
+- 已生成严格嵌套的 5/10/20 小时训练 manifest，完成 Clean/MCT LoRA 正式训练与封存测试；MCT 在
+  Raw 上相对 Clean-LoRA 显著改善 1.16 pp，在 M-WPE 后仅改善 0.10 pp 且区间跨零。
+- 已完成冻结 Paraformer `v2.0.4` 的 500 条封存 test 跨模型复核；M-WPE 将 Robust CER
+  从 3.32% 降至 2.28%（`-1.03 pp`，95% CI `[-1.30,-0.78] pp`），中重度
+  `RT60>=0.6 s` 三档均显著，且未引入 VAD、标点、语言模型或热词。
 
 ## 仓库结构
 
