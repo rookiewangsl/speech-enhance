@@ -208,3 +208,66 @@ def paired_bootstrap_cer_delta(
         seed=seed,
     )
 
+
+def paired_bootstrap_cer_interaction(
+    baseline_raw: Mapping[str, CharacterErrorCounts],
+    baseline_enhanced: Mapping[str, CharacterErrorCounts],
+    candidate_raw: Mapping[str, CharacterErrorCounts],
+    candidate_enhanced: Mapping[str, CharacterErrorCounts],
+    *,
+    draws: int = 10_000,
+    seed: int = 2026,
+) -> BootstrapInterval:
+    """Bootstrap Δenhancement(candidate) − Δenhancement(baseline)."""
+
+    if draws <= 0:
+        raise ValueError("draws must be positive")
+    mappings = (
+        baseline_raw,
+        baseline_enhanced,
+        candidate_raw,
+        candidate_enhanced,
+    )
+    identifiers = sorted(baseline_raw)
+    if not identifiers or any(set(value) != set(identifiers) for value in mappings):
+        raise ValueError("interaction conditions must use identical utterance ids")
+
+    arrays = tuple(
+        np.asarray(
+            [
+                (mapping[key].errors, mapping[key].reference_characters)
+                for key in identifiers
+            ],
+            dtype=np.int64,
+        )
+        for mapping in mappings
+    )
+    reference = arrays[0][:, 1]
+    if any(not np.array_equal(value[:, 1], reference) for value in arrays[1:]):
+        raise ValueError(
+            "interaction conditions disagree in reference character counts"
+        )
+
+    rng = np.random.default_rng(seed)
+    interactions = np.empty(draws, dtype=np.float64)
+    for index in range(draws):
+        sample = rng.integers(0, len(identifiers), size=len(identifiers))
+        reference_count = int(reference[sample].sum())
+        if reference_count == 0:
+            raise ValueError("bootstrap sample has an empty reference")
+        baseline_delta = (
+            arrays[1][sample, 0].sum() - arrays[0][sample, 0].sum()
+        ) / reference_count
+        candidate_delta = (
+            arrays[3][sample, 0].sum() - arrays[2][sample, 0].sum()
+        ) / reference_count
+        interactions[index] = candidate_delta - baseline_delta
+
+    lower, median, upper = np.quantile(interactions, [0.025, 0.5, 0.975])
+    return BootstrapInterval(
+        lower=float(lower),
+        median=float(median),
+        upper=float(upper),
+        draws=draws,
+        seed=seed,
+    )

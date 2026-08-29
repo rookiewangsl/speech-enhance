@@ -48,4 +48,10 @@ for mode in clean mct; do
     --progress-every 20
 done
 
+"${python_bin}" scripts/robust_asr/summarize_lora_wpe_interaction.py \
+  --data-root "${data_root}" \
+  --output-name lora_wpe_interaction_dev_1000utt_v1.json \
+  --bootstrap-draws 10000 \
+  --seed 2026
+
 echo "All W0/Clean-LoRA/MCT-LoRA Raw×M-WPE dev evaluations completed."
