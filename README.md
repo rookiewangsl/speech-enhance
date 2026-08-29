@@ -103,3 +103,4 @@ Paraformer 跨模型验证复用 Whisper 的 `robust-asr` 环境，并补装 Fun
 2. [执行记录与复现](docs/robust_asr/01_执行记录与复现.md)
 3. [项目结论与简历面试叙事](docs/robust_asr/02_项目结论与简历面试叙事.md)
 4. [代码架构与清理记录](docs/robust_asr/03_代码架构与清理记录.md)
+5. [可视化分析](docs/robust_asr/04_可视化分析.md)
