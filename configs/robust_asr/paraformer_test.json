@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "locked_at": "2026-08-29",
+  "selection_basis": "pre_registered_frozen_cross_model_extension",
+  "whisper_test_used_for_parameter_selection": false,
+  "manifest": {
+    "name": "aishell1_test_reverb.jsonl",
+    "rows": 1000,
+    "utterance_limit": 500,
+    "sha256": "d3689b02b91b6ad39d996cd45cff438cc722c0006eb8caed759e240ed23d9743"
+  },
+  "rir": {
+    "split": "test",
+    "manifest_sha256": "a871a0456c2c3ab7bc1c2afe5238cd5b1821f982fb2d9259da21249f801d6c03"
+  },
+  "model": {
+    "id": "iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+    "revision": "v2.0.4",
+    "path": "cache/modelscope/models/iic/speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
+    "model_pt_sha256": "5bba782a5e9196166233b9ab12ba04cadff9ef9212b4ff6153ed9290ff679025",
+    "vad_model": null,
+    "punctuation_model": null,
+    "language_model": null,
+    "hotword": null
+  },
+  "frontends": ["raw", "m_wpe_10"],
+  "rt60_seconds": [0.2, 0.4, 0.6, 0.8, 1.0],
+  "seed": 2026,
+  "bootstrap_draws": 10000,
+  "output": "frozen_paraformer_test_reverb_test_500utt_raw_mwpe_v1.jsonl",
+  "test_time_tuning_allowed": false
+}
