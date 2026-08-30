@@ -383,11 +383,20 @@ def rescore_result_rows(
                 "utterances_improved_by_deterministic_contextual": sum(
                     value[1].errors < value[0].errors for value in values
                 ),
+                "utterances_worsened_by_deterministic_contextual": sum(
+                    value[1].errors > value[0].errors for value in values
+                ),
                 "utterances_improved_by_deterministic_digit_by_digit": sum(
                     value[2].errors < value[0].errors for value in values
                 ),
+                "utterances_worsened_by_deterministic_digit_by_digit": sum(
+                    value[2].errors > value[0].errors for value in values
+                ),
                 "utterances_improved_by_number_equivalence": sum(
                     value[3].errors < value[0].errors for value in values
+                ),
+                "utterances_worsened_by_number_equivalence": sum(
+                    value[3].errors > value[0].errors for value in values
                 ),
                 "formal": formal.as_dict(),
                 "deterministic_contextual": contextual.as_dict(),

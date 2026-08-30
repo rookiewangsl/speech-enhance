@@ -110,6 +110,8 @@ def test_rescore_reports_but_does_not_replace_formal_cer() -> None:
     )
     assert condition["hypotheses_with_ascii_digits"] == 1
     assert condition["utterances_improved_by_number_equivalence"] == 1
+    assert condition["utterances_worsened_by_deterministic_contextual"] == 0
+    assert condition["utterances_worsened_by_number_equivalence"] == 0
     assert condition["formal"]["errors"] == 3
     assert condition["deterministic_contextual"]["errors"] == 1
     assert condition["deterministic_digit_by_digit"]["errors"] == 3
