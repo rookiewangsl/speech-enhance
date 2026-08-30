@@ -224,6 +224,17 @@ def best_number_equivalent_score(
         normalizer.normalize(value)
         for value in number_reading_variants(hypothesis_raw)
     }
+    for policy in ("contextual_cardinal", "digit_by_digit"):
+        references.add(
+            normalizer.normalize(
+                normalize_arabic_numbers(reference_raw, policy=policy)
+            )
+        )
+        hypotheses.add(
+            normalizer.normalize(
+                normalize_arabic_numbers(hypothesis_raw, policy=policy)
+            )
+        )
     if "" in references:
         raise ValueError("normalized reference cannot be empty")
     candidates = (

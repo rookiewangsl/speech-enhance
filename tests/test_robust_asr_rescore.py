@@ -33,6 +33,21 @@ def test_number_equivalent_score_removes_representation_only_errors() -> None:
     assert score.errors == 0
 
 
+def test_number_equivalent_bound_includes_fixed_percent_policy() -> None:
+    fixed = deterministic_number_score(
+        "同比下降百分之四十六",
+        "同比下降46%",
+        normalizer=_normalizer(),
+    )
+    bound = best_number_equivalent_score(
+        "同比下降百分之四十六",
+        "同比下降46%",
+        normalizer=_normalizer(),
+    )
+    assert fixed.errors == 0
+    assert bound.errors <= fixed.errors
+
+
 def test_contextual_number_normalization_is_fixed_and_symmetric() -> None:
     assert normalize_arabic_numbers("同比下降46%") == "同比下降百分之四十六"
     assert normalize_arabic_numbers("2014年7月10日") == "二零一四年七月十日"
@@ -99,5 +114,11 @@ def test_rescore_reports_but_does_not_replace_formal_cer() -> None:
     assert condition["deterministic_contextual"]["errors"] == 1
     assert condition["deterministic_digit_by_digit"]["errors"] == 3
     assert condition["number_equivalent_diagnostic"]["errors"] == 1
+    assert condition["number_equivalent_diagnostic"]["errors"] <= condition[
+        "deterministic_contextual"
+    ]["errors"]
+    assert condition["number_equivalent_diagnostic"]["errors"] <= condition[
+        "deterministic_digit_by_digit"
+    ]["errors"]
     assert condition["subsets"]["hypothesis_with_ascii_digits"]["utterances"] == 1
     assert condition["subsets"]["hypothesis_without_ascii_digits"]["utterances"] == 1
