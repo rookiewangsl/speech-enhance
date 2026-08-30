@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose number/Latin representation effects in existing ASR outputs."""
+"""Rescore existing Mandarin ASR outputs under number-aware policies."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--data-root", type=Path)
     parser.add_argument("--input-name", required=True)
     parser.add_argument("--output-name", required=True)
+    parser.add_argument("--quiet", action="store_true")
     return parser.parse_args()
 
 
@@ -41,7 +42,13 @@ def main() -> None:
         encoding="utf-8",
     )
     os.replace(temporary, destination)
-    print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+    if args.quiet:
+        print(
+            f"rescored {summary['result_rows']} rows: "
+            f"{input_name} -> {output_name}"
+        )
+    else:
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
